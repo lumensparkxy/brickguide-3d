@@ -183,3 +183,9 @@ The approved cloud/batch plan supersedes V1's earlier no-cloud scope. Preserve t
 - Stage 7: finish public deployment checks, operations report and local checkpoint. Keep unresolved reconstruction/checker/large-context limits explicit; do not mark the overall campaign complete.
 
 Primary integrates/cloud deploys; three bounded workers own engine, portal/release and independent review. No remote Git repository or paid inference fallback was created.
+
+### Verified cloud checkpoint
+
+Cloud Build `c98d0db4-954e-4da1-93ce-7339005927af` succeeded. Private preview/authenticated proxy and public deployment passed smoke tests. Live desktop/phone flows record and deduplicate requests without requesting PDF/crop bytes. An actual second-revision traffic promotion and rollback restored the original verified image; test tag removed. Existing Krishi spec/generation and default database configuration remained unchanged.
+
+159 backend, 34 frontend and 31 browser tests passed; three opt-in benchmarks skipped. The final browser run was isolated after output-directory collisions were diagnosed; source-panel collapse on Part/Attach was repaired and inspected. Operations/report documents and immutable local Git checkpoints are retained. The complete-source pilot, deterministic checker, large-context partitioning, 18 remaining constructions and real tutorial publication/recovery remain outstanding; overall plan is not marked complete.

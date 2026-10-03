@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "stage": "cloud_batch_implementation_reconstruction_blocked",
-  "active_milestone": "cloud_deployment_verification",
+  "stage": "public_portal_live_reconstruction_blocked",
+  "active_milestone": "pilot_accuracy_and_deterministic_checker",
   "initial_set": "30669",
   "initial_guide": "alt-02",
   "source_sha256": "6cb3e669fef3662dfd498cba0e631f1d9ec082c2bf8c0fb0a0febe303680a6b6",
@@ -14,7 +14,7 @@
   "human_review_status": "not_run",
   "physical_build_status": "not_run",
   "github_issue_mapping": {},
-  "next_action": "Verify private/public Cloud Run code deployment. Complete source-faithful pilot and implement independently tested geometry/connector checker before opening the remaining 18-booklet campaign gate.",
+  "next_action": "Complete source-faithful pilot and independently tested geometry/connector checker; then unlock remaining 18 booklets. No tutorial publication without exact-version user approval.",
   "evidence_report": "docs/execution/VALIDATION_REPORT.md",
   "source_pages": 8,
   "toolchain": {
@@ -319,7 +319,7 @@
     "physical_build": "not_run"
   },
   "cloud_batch_release": {
-    "stage": "deployment_checks_in_progress",
+    "stage": "website_live_reconstruction_campaign_blocked",
     "baseline_commit": "4860bb7",
     "project": "lumensparkxy",
     "region": "europe-west1",
@@ -327,7 +327,7 @@
     "sources_pinned": 19,
     "source_pages": 2231,
     "cloud_resources": "provisioned_databases_buckets_repository_service_accounts",
-    "web_deployment": "first_build_failed_missing_inputs_fixed_retry_pending",
+    "web_deployment": "verified_public_and_private_preview",
     "budget_alerts": "created_CHF8.26_project_scope_50_80_100_percent",
     "tutorials_published": 0,
     "engine": "restricted_real_codex_pilot_blocked_step3",
@@ -340,6 +340,22 @@
     "automatic_tutorials_completed": 0,
     "deterministic_checker": "not_implemented_fail_closed",
     "large_assembly_context_limit_bytes": 400000,
-    "report": "docs/execution/CLOUD_RELEASE_REPORT.md"
-  }
+    "report": "docs/execution/CLOUD_RELEASE_REPORT.md",
+    "public_url": "https://guide2build-web-i2tso5lznq-ew.a.run.app",
+    "preview_url": "https://guide2build-preview-i2tso5lznq-ew.a.run.app",
+    "deployed_source_commit": "c91669ec1dba0a0b01a938511ea6edb5d67fe2e8",
+    "deployed_image": "europe-west1-docker.pkg.dev/lumensparkxy/guide2build/web@sha256:b0abb031845d479c44ea8240a9da207a29002b0f0f9d6405c5c2fad196bde09e",
+    "backend_tests_passed": 159,
+    "frontend_tests_passed": 34,
+    "browser_tests_passed": 31,
+    "browser_opt_in_skips": 3,
+    "cloud_browser_smoke": "pass_desktop_phone_requests_dedup_private_routes_no_source_bytes",
+    "private_preview_unauthenticated_status": 403,
+    "private_preview_authenticated_proxy_status": 200,
+    "existing_resources": "krishi_spec_generation_and_default_database_configuration_unchanged",
+    "tutorials_awaiting_approval": 0,
+    "website_rollback": "actual_second_revision_promote_and_restore_pass",
+    "tutorial_rollback": "not_run_no_eligible_approved_content"
+  },
+  "legacy_top_level_scene_metrics_scope": "Existing authored-reference v3 only; automatic campaign is recorded in cloud_batch_release."
 }

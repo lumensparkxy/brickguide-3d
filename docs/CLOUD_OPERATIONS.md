@@ -60,3 +60,21 @@ This conservative alert covers the **entire shared project**, including Krishi; 
 Local deployment logs and cloud resource descriptions are under ignored `var/evidence/cloud-release/`. Source upload uses an explicit allowlist in `.gcloudignore`/`.dockerignore`; no `var`, PDFs, source crops, engine jobs, credentials or private evidence is uploaded.
 
 IAM inspection confirms database-conditional roles. An authenticated uploader was allowed to read its request database and denied reads of both release/default databases. Direct impersonation of the portal for an additional probe was not granted: automatic approval review rejected that extra temporary privilege. Portal behavior is verified through the deployed service; no permission bypass is used.
+
+## Deployed checkpoint
+
+Public: https://guide2build-web-i2tso5lznq-ew.a.run.app
+
+Private: https://guide2build-preview-i2tso5lznq-ew.a.run.app (Google IAM required; the documented local proxy was verified).
+
+The first verified image was built from `c91669ec1dba0a0b01a938511ea6edb5d67fe2e8`, digest `sha256:b0abb031845d479c44ea8240a9da207a29002b0f0f9d6405c5c2fad196bde09e`. Source, tests and operations scripts have subsequent local checkpoints; no remote repository exists.
+
+A successful build can be reused after deployment-tool/documentation-only repairs:
+
+```sh
+.venv/bin/python tools/cloud.py deploy --apply --build-id SUCCESSFUL_BUILD_ID
+```
+
+This rejects changes to uploaded application inputs and deploys the existing immutable digest. Normal deployment suppresses streamed build logs so structured output remains parseable; detailed build logs remain in Cloud Logging.
+
+The real rollback drill passed: a second revision of the same image received traffic, then the original revision was restored and smoke-tested. The verification tag was removed. `var/evidence/cloud-release/rollback-exercise.json` records the tested/restored revisions. This is website rollback, not tutorial publication or tutorial-content rollback.

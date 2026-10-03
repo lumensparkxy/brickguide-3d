@@ -506,3 +506,13 @@ Fresh PDF-assisted construction was attempted for 3 small, 3 medium and 4 large 
 Native Apple M3 orbit rendering was 59.83–59.97 frames/s, HTTP-cold prepared-candidate loading 0.929–1.618 seconds, and sampled mixed-workload GPU p95 0.904–3.106 ms. Scope is only 3–66 real pieces per candidate; full-set GPU/VRAM and full 100-page construction latency are not established. Source-versus-render review found real assembly failures despite renderer passes.
 
 Full outcomes, denominators, overlapping authoring intervals, exact evidence and blockers: [TEN_SET_CONSTRUCTION_BENCHMARK.md](TEN_SET_CONSTRUCTION_BENCHMARK.md). Production catalogue and existing30669alt02 scene unchanged.
+
+## Cloud/batch checkpoint — 3 October 2026
+
+See [CLOUD_RELEASE_REPORT.md](CLOUD_RELEASE_REPORT.md) for the current implementation, exact cloud endpoints, 19-booklet inventory and incomplete acceptance gates.
+
+159 backend +34 frontend +31 browser tests pass; three opt-in benchmarks skipped. The full browser suite used isolated artifacts after earlier overlapping runs collided. A real source-panel collapse during Part/Attach was repaired; no physical assembly claim follows from layout tests. Exact frozen-snapshot playback assertions remain.
+
+Public Cloud Run desktop/phone browser checks pass, private preview rejects anonymous traffic, authenticated proxy works, persisted requests were read back from the dedicated requests database, and no PDF or crop bytes were requested by the public UI. Existing Krishi spec/generation and default Firestore configuration are unchanged. Website code is live; zero tutorials are approved/published.
+
+Fresh automatic pilot:2/12 main steps,5 pieces,16 model calls/781.253 active seconds including development retries. Complete-set latency and native-GPU measurements remain unestablished. The deterministic assembly-checker registry is empty and fails closed; all other18 jobs stay queued behind the pilot gate. This does not meet full reconstruction or end-to-end accepted-content pipeline acceptance.

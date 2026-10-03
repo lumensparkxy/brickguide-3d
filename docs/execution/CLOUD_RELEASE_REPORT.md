@@ -6,7 +6,16 @@ Date: 3 October 2026. This is an implementation/evidence report, not a claim tha
 
 The local queue, restricted Codex adapter, public portal, immutable release tooling and dedicated cloud resources are implemented. Real automatic image-based construction reached two of twelve main instructions in the pilot. No tutorial is eligible for publication and none has been approved or published. The other eighteen campaign jobs remain queued behind the pilot gate.
 
-Website deployment verification is in progress; final URL and smoke evidence will be added after the actual deployment succeeds.
+Public website: [https://guide2build-web-i2tso5lznq-ew.a.run.app](https://guide2build-web-i2tso5lznq-ew.a.run.app). IAM-private preview: [https://guide2build-preview-i2tso5lznq-ew.a.run.app](https://guide2build-preview-i2tso5lznq-ew.a.run.app). Both run the same verified image digest, built from local commit `c91669ec1dba0a0b01a938511ea6edb5d67fe2e8`. No tutorial was published.
+
+An actual website recovery exercise deployed a second revision of the same digest, smoke-tested it, routed public traffic to it, and restored the original revision. Final smoke checks passed and the temporary test tag was removed. Evidence: `var/evidence/cloud-release/rollback-exercise.json`. Tutorial-content rollback is separate and remains untested with real approved content.
+
+Final software checks: **159 backend tests, 34 frontend tests, 31 browser tests passed**; three opt-in benchmark tests skipped. Schema, Ruff, TypeScript and production build passed. The live desktop/phone smoke passed: durable request recording/readback, duplicate detection, private API 404s, private preview unauthenticated 403, and no PDF/crop requests or JavaScript errors. Authenticated local preview proxy returned 200.
+
+A cold **browser-cache** portal sample took 1,012 ms; warm sample 34 ms under 40 ms latency / 5 Mbps download throttling. These are single landing-page readiness samples, with Cloud Run already warmed by health checks—not server-cold-start or 3D tutorial load benchmarks.
+
+Evidence: `var/evidence/cloud-release/browser-live/report.json`, `persisted-requests.json`, `private-proxy.json`, `existing-resources-preserved.json`. Krishi's service spec/generation and default Firestore configuration are unchanged; rolling `earliestVersionTime` and its ETag advanced naturally between observations.
+
 
 ## Implemented and checked
 
