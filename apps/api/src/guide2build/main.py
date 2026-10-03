@@ -73,6 +73,10 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             missing("invalid_idempotency_key", "A valid Idempotency-Key header is required.", 422)
         return key
 
+    @app.get("/api/v1/config")
+    def runtime_config():
+        return {"mode": "local", "source_images": True, "requests_enabled": False}
+
     @app.get("/api/v1/health")
     def health():
         return {"status": "ok", "stage": "local_prototype", "runtime_vision_provider": "disabled",

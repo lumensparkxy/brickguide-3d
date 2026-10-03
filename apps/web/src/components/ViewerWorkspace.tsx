@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconChevronLeft, IconChevronRight, IconRotate, IconRotateClockwise, IconPlus, IconMinus, IconArrowsMoveHorizontal, IconFocus2, IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconCube, IconX, IconInfoCircle, IconBook2 } from '@tabler/icons-react';
 import type { Guide, SceneManifest } from '../contracts';
+import type { ReleaseLoader } from '../releases';
 import { partsList, readProgress, saveProgress } from '../state';
 import AssemblyViewport, { type CameraCommand } from './AssemblyViewport';
 import SourcePanel from './SourcePanel';
 import ReviewPanel from './ReviewPanel';
-export default function ViewerWorkspace({ scene, guide, onClose, onScene }: {scene: SceneManifest; guide: Guide; onClose: () => void; onScene: (scene: SceneManifest) => void}) {
+export default function ViewerWorkspace({ scene: initialScene, guide, onClose, onScene, publicMode=false, releaseLoader }: {publicMode?:boolean; releaseLoader?:ReleaseLoader; scene: SceneManifest; guide: Guide; onClose: () => void; onScene: (scene: SceneManifest) => void}) {
+  const [scene,setLoadedScene] = useState(initialScene);
+  const [chunkError,setChunkError] = useState('');
+  const [chunkRetry,setChunkRetry] = useState(0);
   const [thumbnails,setThumbnails] = useState<Record<string,string>>({});
   const [colorNames,setColorNames] = useState<Record<string,string>>({});
   const [index,setIndex] = useState(()=>readProgress(scene)); const [replay,setReplay] = useState(0);
+  useEffect(()=>{if(!releaseLoader){setLoadedScene(initialScene);return;}let stopped=false;setChunkError('');releaseLoader.window(index).then(value=>{if(!stopped){setLoadedScene(value);}}).catch(e=>{if(!stopped)setChunkError(e instanceof Error?e.message:'Instruction unavailable.');});return()=>{stopped=true;};},[initialScene,releaseLoader,index,chunkRetry]);
+  const snapshotReady=!releaseLoader||Object.keys(scene.steps[index].poses).length===scene.steps[index].visible_instance_ids.length;
   const [playback,setPlayback] = useState<'idle'|'playing'|'paused'>('idle');
   const [animationDone,setAnimationDone] = useState(false); const [ready,setReady] = useState(false);
   const [buildFinished,setBuildFinished] = useState(false);
@@ -23,13 +29,13 @@ export default function ViewerWorkspace({ scene, guide, onClose, onScene }: {sce
   const change = (next:number) => {setPlayback('idle');setBuildFinished(false);setIndex(Math.max(0,Math.min(scene.steps.length-1,next)));};
   const startBuild = () => {setReview(false);setTab('3D');setAllParts(false);setBuildFinished(false);setAnimationDone(false);setIndex(0);setPlayback('playing');setReplay(n=>n+1);};
   useEffect(()=>{
-    if(playback!=='playing'||!animationDone||!ready)return;
+    if(playback!=='playing'||!animationDone||!ready||!snapshotReady)return;
     const timer=window.setTimeout(()=>{
       if(index===scene.steps.length-1){setPlayback('idle');setBuildFinished(true);}
       else {setAnimationDone(false);setIndex(i=>i+1);setReplay(n=>n+1);}
     },1000);
     return()=>window.clearTimeout(timer);
-  },[playback,animationDone,ready,index,scene.steps.length]);
+  },[playback,animationDone,ready,snapshotReady,index,scene.steps.length]);
   useEffect(()=>{if(!ready)setPlayback('idle');},[ready]);
   useEffect(()=>{
     const pauseHidden=()=>{if(document.hidden)setPlayback(state=>state==='playing'?'paused':state);};
@@ -42,31 +48,33 @@ export default function ViewerWorkspace({ scene, guide, onClose, onScene }: {sce
     window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);
   },[scene.steps.length]);
   const camera=(action:CameraCommand['action'])=>setCommand(c=>({action,token:c.token+1}));
-  const mainSteps = new Set(scene.steps.map(s=>s.main_step_number)).size;
+  const groupKey=(s:typeof step)=>`${s.section_id??''}:${s.printed_step_number===null?s.step_id:s.main_step_number}`;
+  const stepLabel=(s:typeof step)=>s.printed_step_number===null?'Final assembly':`Step ${s.main_step_number}`;
+  const mainSteps = new Set(scene.steps.map(groupKey)).size;
   const assisted = scene.instances.some(p=>p.origin==='pdf_assisted_authoring');
-  const mainNumbers = [...new Set(scene.steps.map(s=>s.main_step_number))];
-  const siblings = scene.steps.map((s,i)=>({step:s,index:i})).filter(s=>s.step.main_step_number===step.main_step_number);
+  const mainEntries=scene.steps.filter((s,i)=>scene.steps.findIndex(other=>groupKey(other)===groupKey(s))===i);
+  const siblings = scene.steps.map((s,i)=>({step:s,index:i})).filter(s=>groupKey(s.step)===groupKey(step));
   const substepName = (s: typeof step) => s.action==='attach_subassembly'?'Attach':s.substep_label?.replace('callout-','Part ') || 'Build';
   const groupName = step.assembly_group_id?.replaceAll('-',' ').replace(/^./,s=>s.toUpperCase());
   const replayStep = () => {setPlayback('idle');setBuildFinished(false);setReplay(n=>n+1);};
   return <section className="workspace">
     <header className="studio-header">
       <button className="brand studio-brand" onClick={onClose} aria-label="Back to set lookup">Guide2Build <span>3D</span></button>
-      <div className="workspace-heading"><h1><span>{scene.set_number}</span><span className="header-divider">/</span>{guide.label}</h1><span className="candidate-status">{assisted?'PDF-assisted':'Candidate'} · {scene.status.replaceAll('_',' ')}</span></div>
-      <div className="studio-actions"><button ref={reviewButton} className="secondary review-toggle" aria-expanded={review} onClick={()=>{setPlayback(state=>state==='playing'?'paused':state);setReview(v=>!v);}}>{review?'Close review':'Review candidate'}</button>
+      <div className="workspace-heading"><h1><span>{scene.set_number}</span><span className="header-divider">/</span>{guide.label}</h1><span className="candidate-status">{publicMode?'Published tutorial':assisted?'PDF-assisted':'Candidate'} · {scene.status.replaceAll('_',' ')}</span></div>
+      <div className="studio-actions">{!publicMode&&<button ref={reviewButton} className="secondary review-toggle" aria-expanded={review} onClick={()=>{setPlayback(state=>state==='playing'?'paused':state);setReview(v=>!v);}}>{review?'Close review':'Review candidate'}</button>}
       <details className="provenance"><summary aria-label="Source, revision and checks" title="Source, revision and checks"><IconInfoCircle size={21} aria-hidden="true"/><span className="sr-only">Source, revision and checks</span></summary><div className="provenance-content"><h2>Reconstruction details</h2><p><strong>{assisted?'PDF-assisted reference':'Reconstruction candidate'} · {scene.status.replaceAll('_',' ')}</strong></p><p>{assisted?'Authored from source evidence; not an automatic PDF conversion. ':''}Human acceptance: {scene.status==='human_reviewed'?'recorded':'not recorded'} · Physical build: {scene.physical_build_check.replaceAll('_',' ')}</p><p>Coverage: {guide.expected_main_steps == null ? `${mainSteps} main steps in this candidate; full instruction count unverified` : `${mainSteps} of ${guide.expected_main_steps} main steps`} · {scene.steps.length} instructions · {scene.instances.length} physical pieces</p><p>Revision: {scene.revision}<br/>Source SHA-256: <code>{scene.source_sha256}</code></p><p>Geometry: {scene.geometry_check} · Connections: {scene.connector_check} · Physical build: {scene.physical_build_check}</p><p>Passing structural checks does not establish physical assembly or strength.</p></div></details></div>
     </header>
     <div className={`workspace-grid${review?' review-open':''}`} data-mobile-tab={tab}>
       <div className="instruction-rail">
         <section className="instruction-context" aria-label="Current instruction">
           <span className="eyebrow">INSTRUCTION {index+1} OF {scene.steps.length}</span>
-          <h2>Step {step.main_step_number}{guide.expected_main_steps != null && <span> of {guide.expected_main_steps}</span>}</h2>
+          <h2>{stepLabel(step)}{!step.section_id&&guide.expected_main_steps != null && <span> of {guide.expected_main_steps}</span>}</h2>
           <div className="instruction-copy-slot"><p className="instruction-copy">{step.instruction}</p>{siblings.length>1&&siblings.map(s=><p key={s.index} className="instruction-copy instruction-copy-sizer" aria-hidden="true">{s.step.instruction}</p>)}</div>
           {groupName&&<p className="group-label">{groupName} · {substepName(step)}</p>}
           {siblings.length>1&&<nav className="substep-navigation" aria-label={`Step ${step.main_step_number} substeps`}>{siblings.map(s=><button key={s.index} aria-current={s.index===index?'step':undefined} onClick={()=>change(s.index)}>{substepName(s.step)}</button>)}</nav>}
         </section>
         <div className="mobile-tabs" role="tablist" aria-label="Workspace panels">{['3D','Guide','Pieces'].map(value=><button id={`tab-${value}`} role="tab" tabIndex={tab===value?0:-1} aria-selected={tab===value} aria-controls={`panel-${value}`} key={value} onKeyDown={event=>{const panels=['3D','Guide','Pieces'];const current=panels.indexOf(value);const next=event.key==='ArrowRight'?(current+1)%3:event.key==='ArrowLeft'?(current+2)%3:event.key==='Home'?0:event.key==='End'?2:-1;if(next>=0){event.preventDefault();setTab(panels[next]);document.getElementById(`tab-${panels[next]}`)?.focus();}}} onClick={()=>setTab(value)}>{value}</button>)}</div>
-        <aside id="panel-Guide" role={phone?'tabpanel':undefined} aria-labelledby={phone?'tab-Guide':undefined} className="source-pane" tabIndex={0} aria-label="Official guide panel"><div className="pane-heading"><h2><IconBook2 size={18} aria-hidden="true"/>Original guide</h2><span className="pill">Page {step.source.page_index+1}</span></div><p className="source-step-label">Main step {step.main_step_number}{step.substep_label?` · ${substepName(step)}`:''}</p><SourcePanel panel={step.source}/></aside>
+        <aside id="panel-Guide" role={phone?'tabpanel':undefined} aria-labelledby={phone?'tab-Guide':undefined} className="source-pane" tabIndex={0} aria-label="Official guide panel"><div className="pane-heading"><h2><IconBook2 size={18} aria-hidden="true"/>Original guide</h2><span className="pill">Page {step.source.page_index+1}</span></div><p className="source-step-label">Main step {step.main_step_number}{step.substep_label?` · ${substepName(step)}`:''}</p><SourcePanel panel={step.source} officialOnly={publicMode} officialUrl={scene.sources?.find(s=>s.source_sha256===step.source.source_sha256)?.official_url??guide.pdf_url} bookletLabel={scene.sources?.find(s=>s.source_sha256===step.source.source_sha256)?.guide_id??guide.label}/></aside>
         <aside id="panel-Pieces" role={phone?'tabpanel':undefined} aria-labelledby={phone?'tab-Pieces':undefined} className="step-pane" tabIndex={0} aria-label="Instruction details and parts">
           <div className="parts-toggle"><button className={!allParts?'selected':''} aria-pressed={!allParts} onClick={()=>setAllParts(false)}>New pieces</button><button className={allParts?'selected':''} aria-pressed={allParts} onClick={()=>setAllParts(true)}>Full parts list</button></div>
           {rows.length?<table className="parts-table"><thead className="sr-only"><tr><th>Part / colour</th><th>Qty</th></tr></thead><tbody>{rows.map(row=><tr key={`${row.partId}:${row.color}`}><td><div className="part-identity">{thumbnails[`${row.partId}:${row.color}`]&&<img src={thumbnails[`${row.partId}:${row.color}`]} alt={`Part ${row.partId}, colour ${row.color}`} width="72" height="72"/>}<span><strong>{row.partId}</strong><small>{colorNames[row.color]||`Colour ${row.color}`}</small></span></div></td><td>×{row.quantity}</td></tr>)}</tbody></table>:<p className="empty-pieces">No new pieces. Use the subassembly you have already built.</p>}
@@ -75,11 +83,11 @@ export default function ViewerWorkspace({ scene, guide, onClose, onScene }: {sce
         </aside>
       </div>
       <section id="panel-3D" role={phone?'tabpanel':'region'} aria-labelledby={phone?'tab-3D':undefined} className="model-pane" aria-label="Interactive 3D assembly"><div className="model-caption"><span><IconCube size={23} aria-hidden="true"/>{step.action==='build_subassembly'?'Build detached subassembly':step.action==='attach_subassembly'?'Attach the same subassembly':'3D assembly'}</span><span className="active-legend">Active pieces outlined</span></div>
-        <AssemblyViewport scene={scene} step={step} previous={scene.steps[index-1]} replayToken={replay} command={command} onThumbnails={setThumbnails} onColorNames={setColorNames} fullBuild={playback!=='idle'} paused={playback==='paused'} onAnimationComplete={()=>setAnimationDone(true)} onReadyChange={setReady}/>
+        {chunkError?<div role="alert" className="viewport-message error"><p>{chunkError}</p><button onClick={()=>setChunkRetry(n=>n+1)}>Retry instruction</button></div>:!snapshotReady?<p role="status" className="viewport-message">Loading this instruction…</p>:<AssemblyViewport scene={scene} step={step} previous={scene.steps[index-1]} replayToken={replay} command={command} onThumbnails={setThumbnails} onColorNames={setColorNames} fullBuild={playback!=='idle'} paused={playback==='paused'} onAnimationComplete={()=>setAnimationDone(true)} onReadyChange={setReady}/>}
         <div className="camera-controls" role="group" aria-label="Camera controls"><div className="camera-pair"><button onClick={()=>camera('left')} aria-label="Rotate left" title="Rotate left"><IconRotate size={21}/></button><button onClick={()=>camera('right')} aria-label="Rotate right" title="Rotate right"><IconRotateClockwise size={21}/></button><span>Rotate</span></div><button onClick={()=>camera('in')} aria-label="Zoom in" title="Zoom in"><IconPlus size={23}/><span>Zoom in</span></button><button onClick={()=>camera('out')} aria-label="Zoom out" title="Zoom out"><IconMinus size={23}/><span>Zoom out</span></button><button onClick={()=>camera('reset')} aria-label="Reset view" title="Reset view"><IconFocus2 size={23}/><span>Reset view</span></button><div className="camera-pair"><button onClick={()=>camera('pan-left')} aria-label="Pan left" title="Pan left"><IconChevronLeft size={21}/></button><button onClick={()=>camera('pan-right')} aria-label="Pan right" title="Pan right"><IconChevronRight size={21}/></button><span><IconArrowsMoveHorizontal size={14}/> Pan</span></div></div>
         <p className="gesture-hint"><span className="desktop-hint">Drag to rotate · Scroll to zoom · Right-drag to pan</span><span className="touch-hint">Drag to rotate · Pinch to zoom</span></p>
       </section>
-      {review&&<dialog ref={reviewDialog} className="review-drawer" aria-label="Review workspace" onCancel={event=>{event.preventDefault();setReview(false);}}><div className="review-drawer-heading"><h2>Reconstruction review</h2><button className="icon-button" aria-label="Dismiss review" onClick={()=>setReview(false)}><IconX size={20}/></button></div><ReviewPanel scene={scene} step={step} onScene={onScene} onNavigate={stepId=>{const next=scene.steps.findIndex(s=>s.step_id===stepId);if(next>=0){change(next);setTab('3D');if(overlayReview)setReview(false);}}}/></dialog>}
+      {!publicMode&&review&&<dialog ref={reviewDialog} className="review-drawer" aria-label="Review workspace" onCancel={event=>{event.preventDefault();setReview(false);}}><div className="review-drawer-heading"><h2>Reconstruction review</h2><button className="icon-button" aria-label="Dismiss review" onClick={()=>setReview(false)}><IconX size={20}/></button></div><ReviewPanel scene={scene} step={step} onScene={onScene} onNavigate={stepId=>{const next=scene.steps.findIndex(s=>s.step_id===stepId);if(next>=0){change(next);setTab('3D');if(overlayReview)setReview(false);}}}/></dialog>}
     </div>
     <nav className="step-navigation" aria-label="Instruction navigation">
       <button className="secondary previous-button" disabled={index===0} onClick={()=>change(index-1)}><IconChevronLeft size={20} aria-hidden="true"/><span>Previous</span></button>
@@ -87,7 +95,7 @@ export default function ViewerWorkspace({ scene, guide, onClose, onScene }: {sce
         {playback==='idle'?<button className="secondary" disabled={!ready} onClick={startBuild}><IconPlayerPlay size={19} aria-hidden="true"/><span>Play full build</span></button>:<><button className="secondary" onClick={()=>setPlayback(state=>state==='playing'?'paused':'playing')}>{playback==='playing'?<IconPlayerPause size={18} aria-hidden="true"/>:<IconPlayerPlay size={18} aria-hidden="true"/>}<span>{playback==='playing'?'Pause build':'Resume build'}</span></button><button className="icon-button" aria-label="Stop build" title="Stop build" onClick={()=>{setPlayback('idle');setBuildFinished(false);}}><IconPlayerStop size={18}/></button></>}
         <span className="sr-only" role="status">{playback==='playing'?`Playing slowly · instruction ${index+1} of ${scene.steps.length}`:playback==='paused'?`Paused · instruction ${index+1} of ${scene.steps.length}`:buildFinished?'Playback complete · all instructions shown':`Watch all ${scene.steps.length} instructions, from the beginning.`}</span>
       </div>
-      <div className="instruction-progress"><div className="step-timeline" aria-label="Main steps">{mainNumbers.map(number=><button key={number} className={number===step.main_step_number?'current':''} aria-current={number===step.main_step_number?'step':undefined} aria-label={`Go to main step ${number}`} onClick={()=>change(scene.steps.findIndex(s=>s.main_step_number===number))}>{number}</button>)}</div><div className="seek-row"><button className="replay" disabled={!ready} onClick={replayStep}><IconRotateClockwise size={16} aria-hidden="true"/>Replay</button><label htmlFor="instruction-seek" className="sr-only">Jump to instruction</label><select id="instruction-seek" value={index} onChange={e=>change(Number(e.target.value))}>{scene.steps.map((s,i)=><option key={s.step_id} value={i}>{i+1}. Main step {s.main_step_number}{s.substep_label?` · ${s.substep_label}`:''}</option>)}</select><span className="sr-only" aria-live="polite">Instruction {index+1} of {scene.steps.length}</span></div></div>
+      <div className="instruction-progress"><div className="step-timeline" aria-label="Main steps">{mainEntries.map(entry=><button key={groupKey(entry)} className={groupKey(entry)===groupKey(step)?'current':''} aria-current={groupKey(entry)===groupKey(step)?'step':undefined} aria-label={`Go to main step ${entry.main_step_number}${entry.section_id?` in ${entry.section_id}`:''}`} onClick={()=>change(scene.steps.findIndex(s=>s.step_id===entry.step_id))}>{entry.printed_step_number===null?'✓':entry.main_step_number}</button>)}</div><div className="seek-row"><button className="replay" disabled={!ready} onClick={replayStep}><IconRotateClockwise size={16} aria-hidden="true"/>Replay</button><label htmlFor="instruction-seek" className="sr-only">Jump to instruction</label><select id="instruction-seek" value={index} onChange={e=>change(Number(e.target.value))}>{scene.steps.map((s,i)=><option key={s.step_id} value={i}>{i+1}. {s.section_id?`${s.section_id} · `:''}{stepLabel(s)}{s.substep_label?` · ${s.substep_label}`:''}</option>)}</select><span className="sr-only" aria-live="polite">Instruction {index+1} of {scene.steps.length}</span></div></div>
       <button className="next-button" disabled={index===scene.steps.length-1} onClick={()=>change(index+1)}><span>Next</span><IconChevronRight size={20} aria-hidden="true"/></button>
     </nav>
   </section>;

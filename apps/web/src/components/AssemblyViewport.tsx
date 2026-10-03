@@ -67,6 +67,9 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
   onColorNames?: (names: Record<string,string>) => void;
   fullBuild: boolean; paused: boolean; onAnimationComplete: () => void; onReadyChange: (ready:boolean) => void;
 }) {
+  const manifestRef=useRef(manifest);manifestRef.current=manifest;
+  const geometryBase=manifest.geometry_base_url??'/assets-local/ldraw/';
+  const frameKey=(snapshot:StepSnapshot)=>`${snapshot.section_id??''}:${snapshot.printed_step_number===null?snapshot.step_id:snapshot.main_step_number}`;
   const host = useRef<HTMLDivElement>(null); const stepRef = useRef(step);
   const applyStep = useRef<((animate?: boolean) => void) | null>(null);
   const cameraCommand = useRef<((action: CameraCommand['action']) => void) | null>(null);
@@ -76,7 +79,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
   const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
   useEffect(()=>{onReadyChange(!loading&&!error);},[loading,error,onReadyChange]);
   useEffect(()=>{ if(fullBuild) cameraCommand.current?.('reset'); else applyStep.current?.(false); },[fullBuild]);
-  useEffect(() => { const changedMainStep = stepRef.current.main_step_number !== step.main_step_number; stepRef.current = step; applyStep.current?.(false); if(!playbackRef.current.fullBuild && changedMainStep) cameraCommand.current?.('reset'); }, [step, previous]);
+  useEffect(() => { const changedMainStep = frameKey(stepRef.current) !== frameKey(step); stepRef.current = step; applyStep.current?.(false); if(!playbackRef.current.fullBuild && changedMainStep) cameraCommand.current?.('reset'); }, [step, previous]);
   useEffect(() => { if (replayToken) applyStep.current?.(true); }, [replayToken]);
   useEffect(() => { cameraCommand.current?.(command.action); }, [command]);
   useEffect(() => {
@@ -105,7 +108,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     const assembly = new THREE.Group(); world.add(assembly);
     const groups = new Map<string, THREE.Group>(); const outlines = new Map<string, THREE.BoxHelper>();
     const emphasis = new Map<string, THREE.Group>();
-    const mainStepFrames = new Map<number,{bounds:THREE.Box3; parts:THREE.Box3[]}>();
+    const mainStepFrames = new Map<string,{bounds:THREE.Box3; parts:THREE.Box3[]}>();
     const cache = new Map<string, Promise<THREE.Group>>(); const geometries = new Set<THREE.BufferGeometry>(); const materials = new Set<THREE.Material>();
     const register = (object: THREE.Object3D) => object.traverse(child => { if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) { geometries.add(child.geometry); (Array.isArray(child.material) ? child.material : [child.material]).forEach(m => materials.add(m)); } });
     // Replay emphasis reuses each actual part surface; it never adds or moves physical instances.
@@ -126,7 +129,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     const manager = new THREE.LoadingManager(); const failures = new Set<string>();
     let resources: Record<string, {dependencies: string[]}> = {}; let fileMap: Record<string, string> = {};
     manager.setURLModifier(url => {
-      const root = '/assets-local/ldraw/';
+      const root = geometryBase;
       if (!url.startsWith(root) || url.includes('..') || url.includes('\\')) throw new Error('Unsafe part dependency');
       const ref = url.slice(root.length); if (ref === 'LDConfig.ldr') return url;
       const bare = ref.replace(/^(parts|p)\//, '');
@@ -135,8 +138,15 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       return root + resolved;
     });
     manager.onError = url => { failures.add(url); };
-    const loader = new LDrawLoader(manager); loader.setConditionalLineMaterial(LDrawConditionalLineMaterial); loader.setPartsLibraryPath('/assets-local/ldraw/');
+    const loader = new LDrawLoader(manager); loader.setConditionalLineMaterial(LDrawConditionalLineMaterial); loader.setPartsLibraryPath(geometryBase);
     applyStep.current = (animate = false) => {
+      mainStepFrames.clear();
+      for(const snapshot of manifestRef.current.steps) {
+        if(frameKey(snapshot)!==frameKey(stepRef.current))continue;
+        const bounds=new THREE.Box3();const parts:THREE.Box3[]=[];
+        for(const id of snapshot.visible_instance_ids){const part=groups.get(id);const pose=snapshot.poses[id];if(!part||!pose)continue;const oldPosition=part.position.clone(),oldRotation=part.quaternion.clone();part.position.fromArray(pose.position_ldu);part.quaternion.fromArray(pose.quaternion_xyzw);const box=new THREE.Box3().setFromObject(part);bounds.union(box);parts.push(box);part.position.copy(oldPosition);part.quaternion.copy(oldRotation);}
+        const key=frameKey(snapshot);const frame=mainStepFrames.get(key)??{bounds:new THREE.Box3(),parts:[]};frame.bounds.union(bounds);frame.parts.push(...parts);mainStepFrames.set(key,frame);
+      }
       tween = null; setPlacementNote(''); const current = stepRef.current; const visible = new Set(current.visible_instance_ids); const active = new Set(current.active_instance_ids);
       const from = new Map<string, THREE.Vector3>();
       for (const [id, group] of groups) {
@@ -151,7 +161,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
         const overlay = emphasis.get(id); if (overlay) overlay.visible = false;
       }
       const stageBounds = new THREE.Box3(); for (const group of groups.values()) if (group.visible) stageBounds.expandByObject(group);
-      updateStage(mainStepFrames.get(current.main_step_number)?.bounds ?? stageBounds);
+      updateStage(mainStepFrames.get(frameKey(current))?.bounds ?? stageBounds);
       if (from.size) {
         const moving=[...from.keys()].map(id=>new THREE.Box3().setFromObject(groups.get(id)!));
         const obstacles=[...groups].filter(([id,group])=>group.visible&&!active.has(id)).map(([,group])=>new THREE.Box3().setFromObject(group));
@@ -167,7 +177,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     let buildBounds: THREE.Box3 | null = null;
     const fit = () => {
       stopCameraMotion(camera, controls);
-      const siblingFrame = mainStepFrames.get(stepRef.current.main_step_number);
+      const siblingFrame = mainStepFrames.get(frameKey(stepRef.current));
       const frameBounds = playbackRef.current.fullBuild && buildBounds ? buildBounds : siblingFrame?.bounds;
       const box = frameBounds ? frameBounds.clone() : new THREE.Box3(); if(!frameBounds) for (const group of groups.values()) if (group.visible) box.expandByObject(group);
       const center = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
@@ -233,7 +243,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     const onLost = (event: Event) => { event.preventDefault(); setError('The 3D graphics context was lost. Reopen the tutorial to restore the viewer.'); }; renderer.domElement.addEventListener('webglcontextlost',onLost);
     (async () => {
       if(benchmark)benchmark.audit.phases.assetLoadingStartMs=performance.now();
-      const provenanceResponse = await fetch('/assets-local/ldraw/provenance.json');
+      const provenanceResponse = await fetch(geometryBase+'provenance.json');
       if (!provenanceResponse.ok) throw new Error('Individual-part provenance catalogue is unavailable.');
       const provenance = await provenanceResponse.json();
       if (!provenance || typeof provenance.resources !== 'object') throw new Error('Invalid part provenance catalogue.');
@@ -249,7 +259,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
         for (const dependency of resources[path].dependencies) verifyDependencies(dependency, depth+1);
       };
       manifest.instances.forEach(part => verifyDependencies(part.geometry_ref));
-      await loader.preloadMaterials('/assets-local/ldraw/LDConfig.ldr');
+      await loader.preloadMaterials(geometryBase+'LDConfig.ldr');
       loader.materials.forEach(material => materials.add(material));
       if (cancelled) { materials.forEach(material => material.dispose()); return; }
       for (const part of manifest.instances) if (!loader.getMaterial(part.color_code)) throw new Error(`Part ${part.part_id}: unknown LDraw colour ${part.color_code}.`);
@@ -303,20 +313,20 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       const {width,height} = element.getBoundingClientRect(); renderer.setSize(Math.max(width,1),Math.max(height,1)); camera.aspect=Math.max(width,1)/Math.max(height,1); camera.updateProjectionMatrix();
       // One framing for the whole playback, including detached callouts and entry motion.
       buildBounds=new THREE.Box3();
-      const siblingCounts = new Map<number,number>(); for(const snapshot of manifest.steps) siblingCounts.set(snapshot.main_step_number,(siblingCounts.get(snapshot.main_step_number)??0)+1);
-      for(const snapshot of manifest.steps) for(const id of snapshot.visible_instance_ids) {
-        const group=groups.get(id)!;const pose=snapshot.poses[id];
+      const siblingCounts = new Map<string,number>(); for(const snapshot of manifestRef.current.steps) siblingCounts.set(frameKey(snapshot),(siblingCounts.get(frameKey(snapshot))??0)+1);
+      for(const snapshot of manifestRef.current.steps) for(const id of snapshot.visible_instance_ids) {
+        const group=groups.get(id)!;const pose=snapshot.poses[id];if(!pose)continue;
         group.position.fromArray(pose.position_ldu);group.quaternion.fromArray(pose.quaternion_xyzw);
         const partBounds = new THREE.Box3().setFromObject(group); buildBounds.union(partBounds);
-        if(siblingCounts.get(snapshot.main_step_number)! > 1) {
-          if(!mainStepFrames.has(snapshot.main_step_number)) mainStepFrames.set(snapshot.main_step_number,{bounds:new THREE.Box3(),parts:[]});
-          const frame = mainStepFrames.get(snapshot.main_step_number)!; frame.bounds.union(partBounds); frame.parts.push(partBounds);
+        if(siblingCounts.get(frameKey(snapshot))! > 1) {
+          if(!mainStepFrames.has(frameKey(snapshot))) mainStepFrames.set(frameKey(snapshot),{bounds:new THREE.Box3(),parts:[]});
+          const frame = mainStepFrames.get(frameKey(snapshot))!; frame.bounds.union(partBounds); frame.parts.push(partBounds);
         }
       }
       if(!buildBounds.isEmpty()){buildBounds.max.y+=60;buildBounds.min.y-=60;}
       applyStep.current?.(); fit(); if (!cancelled) { if(benchmark)benchmark.audit.readyAtMs=performance.now(); setLoading(false); }
     })().catch(e => { if (!cancelled) { assembly.visible = false; floor.visible = false; outlines.forEach(o => o.visible = false); dirty = true; setError(`Required geometry unavailable. ${e instanceof Error ? e.message : 'Asset error'}`); setLoading(false); } });
     return () => { cancelled = true; cancelAnimationFrame(frame); resize.disconnect(); controls.removeEventListener('change',invalidate); document.removeEventListener('visibilitychange',invalidate); controls.dispose(); renderer.domElement.removeEventListener('webglcontextlost',onLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); light.shadow.dispose(); benchmark?.dispose(); renderer.dispose(); renderer.domElement.remove(); applyStep.current = null; cameraCommand.current = null; };
-  }, [manifest]);
+  }, [manifest.revision, geometryBase]);
   return <div className="viewport-wrap"><div className="viewport" ref={host} data-step-id={step.step_id}/>{placementNote && <p className="placement-note" role="status">{placementNote}</p>}{loading && <p role="status" className="viewport-message">Loading individual part geometry…</p>}{error && <p role="alert" className="viewport-message error">{error}</p>}</div>;
 }

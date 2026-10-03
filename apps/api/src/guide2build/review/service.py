@@ -82,7 +82,7 @@ class ReviewService:
 
     def apply(self, revision: str, request: CorrectionRequest | ReviewRequest, key: str):
         # A public local JSON assertion cannot establish that a human personally reviewed this build.
-        if isinstance(request, ReviewRequest) and request.actor_type != "agent":
+        if request.actor_type != "agent":
             raise ValueError("Human review identity is not verified by this local API; use agent provenance")
         if revision != request.expected_revision:
             raise Conflict("Expected revision does not match the addressed revision")

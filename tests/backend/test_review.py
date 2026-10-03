@@ -139,10 +139,8 @@ def test_declared_human_correction_never_grants_review(tmp_path, scene_data):
     service.import_scene(SceneManifest.model_validate(scene_data))
     data = correction(scene_data).model_dump()
     data["actor_type"] = "human"
-    result = service.apply(scene_data["revision"], CorrectionRequest.model_validate(data), "operator")
-    assert result.status == "needs_review"
-    assert not result.reviews
+    import pytest
+    with pytest.raises(ValueError, match="Human review identity is not verified"):
+        service.apply(scene_data["revision"], CorrectionRequest.model_validate(data), "operator")
     with store.connect() as db:
-        import json
-        audit = json.loads(db.execute("SELECT payload FROM review_actions").fetchone()[0])
-    assert audit["origin"] == "local_api_declared_human"
+        assert db.execute("SELECT count(*) FROM review_actions").fetchone()[0] == 0

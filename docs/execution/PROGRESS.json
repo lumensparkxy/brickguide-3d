@@ -317,5 +317,21 @@
     "evidence": "var/evidence/ten-set-construction/",
     "human_review": "not_run",
     "physical_build": "not_run"
+  },
+  "cloud_batch_release": {
+    "stage": "implementation_in_progress",
+    "baseline_commit": "4860bb7",
+    "project": "lumensparkxy",
+    "region": "europe-west1",
+    "administrator": "maswadkar@gmail.com",
+    "sources_pinned": 19,
+    "source_pages": 2231,
+    "cloud_resources": "provisioned_databases_buckets_repository_service_accounts",
+    "web_deployment": "not_run",
+    "budget_alerts": "billing_api_permission_denied_investigating_project_console",
+    "tutorials_published": 0,
+    "engine": "real_codex_image_call_verified_pilot_blocked_part_identity_retrying",
+    "public_portal_browser_checks": 13,
+    "manual_tutorial_approval_required": true
   }
 }

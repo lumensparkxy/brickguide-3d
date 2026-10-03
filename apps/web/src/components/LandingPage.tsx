@@ -2,9 +2,9 @@ import { IconArrowRight } from '@tabler/icons-react';
 import type { FormEvent, ReactNode } from 'react';
 import './landing.css';
 
-export default function LandingPage({setNumber,onSetNumber,onFind,onTry,busy,children}: {
+export default function LandingPage({setNumber,onSetNumber,onFind,onTry,busy,children,publicMode=false}: {
   setNumber:string; onSetNumber:(value:string)=>void; onFind:(event:FormEvent)=>void;
-  onTry:()=>void; busy:boolean; children:ReactNode;
+  onTry:()=>void; busy:boolean; publicMode?:boolean; children:ReactNode;
 }) {
   return <>
     <header className="landing-header"><a href="/" className="brand">Guide2Build <span>3D</span></a><a className="how-link" href="#how-it-works">How it works</a></header>
@@ -17,9 +17,9 @@ export default function LandingPage({setNumber,onSetNumber,onFind,onTry,busy,chi
           <form className="landing-search" onSubmit={onFind} noValidate>
             <label htmlFor="set-number">Your set number</label>
             <div className="landing-search-row"><input id="set-number" inputMode="numeric" autoComplete="off" maxLength={7} value={setNumber} onChange={event=>onSetNumber(event.target.value)} aria-describedby="supported"/><button id="find-set" disabled={busy}>{busy?'Please wait…':'Find my set'}</button></div>
-            <p id="supported">Official booklets for 10 sets · 3D candidate: 30669, alternate 02</p>
+            <p id="supported">{publicMode?'Ready tutorials load straight away. More builds are on the way.':'Official booklets for 10 sets · 3D candidate: 30669, alternate 02'}</p>
           </form>
-          <button className="try-tutorial" disabled={busy} onClick={onTry}>Try the plane tutorial <IconArrowRight size={22} aria-hidden="true"/></button>
+          <button className="try-tutorial" disabled={busy} onClick={onTry}>{publicMode?'Find the plane set':'Try the plane tutorial'} <IconArrowRight size={22} aria-hidden="true"/></button>
           {busy&&<p className="landing-busy" role="status">Working on your request…</p>}
         </div>
         <figure className="hero-art"><figcaption>30669 / Alternate aeroplane<small>Illustrative preview</small></figcaption><img src="/images/landing/hero-plane.webp" width="1322" height="1190" alt="Illustration of a red and white brick plane on a yellow baseplate, surrounded by colourful bricks" fetchPriority="high"/></figure>
@@ -30,10 +30,10 @@ export default function LandingPage({setNumber,onSetNumber,onFind,onTry,busy,chi
         <ol className="build-steps">
           <li><img src="/images/landing/step-brick.webp" width="640" height="420" alt="" loading="lazy"/><div className="build-step-copy"><span className="step-number" aria-hidden="true">01</span><div><h3>Find your set</h3><p>Enter the set number from your box or booklet to get started.</p></div></div></li>
           <li><img src="/images/landing/step-booklet.webp" width="640" height="420" alt="" loading="lazy"/><div className="build-step-copy"><span className="step-number" aria-hidden="true">02</span><div><h3>Choose the booklet</h3><p>Select the official booklet. We’ll show the available version for your set.</p></div></div></li>
-          <li><img src="/images/landing/step-tutorial.webp" width="640" height="420" alt="" loading="lazy"/><div className="build-step-copy"><span className="step-number" aria-hidden="true">03</span><div><h3>Build in 3D</h3><p>Open an available 3D candidate alongside its guide. Other booklets can be prepared for reconstruction.</p></div></div></li>
+          <li><img src="/images/landing/step-tutorial.webp" width="640" height="420" alt="" loading="lazy"/><div className="build-step-copy"><span className="step-number" aria-hidden="true">03</span><div><h3>Build in 3D</h3><p>{publicMode?'Follow a ready tutorial, one piece at a time. If your set isn’t ready, we’ll add it to our building list.':'Open an available 3D candidate alongside its guide. Other booklets can be prepared for reconstruction.'}</p></div></div></li>
         </ol>
       </section>
     </main>
-    <footer className="landing-footer"><p>Independent prototype · PDF-assisted candidates are labelled for review.<br/>Not affiliated with or endorsed by the LEGO Group.</p><p className="artwork-note">Artwork is illustrative. Source and review details are available in the tutorial.</p></footer>
+    <footer className="landing-footer"><p>{publicMode?'Independent building companion.':'Independent prototype · PDF-assisted candidates are labelled for review.'}<br/>Not affiliated with or endorsed by the LEGO Group.</p><p className="artwork-note">Artwork is illustrative. Source and review details are available in the tutorial.</p></footer>
   </>;
 }

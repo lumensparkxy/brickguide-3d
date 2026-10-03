@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SourcePanel as Panel } from '../contracts';
-export default function SourcePanel({ panel }: {panel: Panel}) {
+export default function SourcePanel({ panel, officialOnly=false, officialUrl, bookletLabel }: {panel: Panel; officialOnly?:boolean; officialUrl?:string; bookletLabel?:string}) {
   const canvas = useRef<HTMLCanvasElement>(null); const [error, setError] = useState(''); const [ready, setReady] = useState(false);
   const url = `/api/v1/sources/${panel.source_sha256}/pages/${panel.page_index}`;
   useEffect(() => {
+    if(officialOnly)return;
     let stopped = false; const img = new Image(); setReady(false); setError('');
     img.onload = () => {
       if (stopped || !canvas.current) return;
@@ -16,7 +17,8 @@ export default function SourcePanel({ panel }: {panel: Panel}) {
     };
     img.onerror = () => { if (!stopped) setError('The local source page could not be loaded. Re-run source preparation to restore it.'); };
     img.src = url; return () => { stopped = true; img.onload = null; img.onerror = null; };
-  }, [panel, url]);
+  }, [panel, url, officialOnly]);
+  if(officialOnly)return <div className="official-source-reference"><p>{bookletLabel} · PDF page {panel.page_index+1}</p><p>Keep your official booklet beside you as you build.</p><a className="source-link" href={`${officialUrl}#page=${panel.page_index+1}`} target="_blank" rel="noreferrer">Open official booklet ↗</a></div>;
   return <><div className="source-crop">{!ready && !error && <p role="status">Loading source panel…</p>}
     {error && <p role="alert">{error}</p>}<canvas hidden={!ready} ref={canvas} role="img" aria-label={`Official instruction crop from PDF page ${panel.page_index+1}`}/></div>
     <a className="source-link" href={url} target="_blank" rel="noreferrer">Open full-size page {panel.page_index+1} ↗</a></>;

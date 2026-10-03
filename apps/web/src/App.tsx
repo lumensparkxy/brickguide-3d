@@ -1,12 +1,21 @@
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, parseGuideStatus, parseJob, post, request, type ConversionJob } from './api';
 import { parseScene, parseSet } from './validation';
+import { parseConfig, ReleaseLoader, REQUEST_RECORDED, type PortalConfig } from './releases';
+import { readProgress } from './state';
 import type { Guide, SceneManifest, SetInfo } from './contracts';
 import LandingPage from './components/LandingPage';
 import BookletDialog from './components/BookletDialog';
 const ViewerWorkspace = lazy(() => import('./components/ViewerWorkspace'));
 const terminal = new Set(['ready', 'needs_review', 'failed', 'cancelled']);
 export default function App() {
+  const [config,setConfig] = useState<PortalConfig | null>(null);
+  const [configError,setConfigError] = useState('');
+  const [configAttempt,setConfigAttempt] = useState(0);
+  const [release,setRelease] = useState<ReleaseLoader | null>(null);
+  const [requested,setRequested] = useState(false);
+  const publicMode = config?.mode !== 'local';
+  useEffect(()=>{let stopped=false;setConfigError('');request('/config').then(parseConfig).then(value=>{if(!stopped)setConfig(value);}).catch(e=>{if(!stopped)setConfigError(e instanceof Error?e.message:'Website settings unavailable.');});return()=>{stopped=true;};},[configAttempt]);
   const [setNumber, setSetNumber] = useState('30669');
   const [bookletOpen,setBookletOpen] = useState(false);
   const [setInfo, setSetInfo] = useState<SetInfo | null>(null);
@@ -41,19 +50,30 @@ export default function App() {
   }, [job?.job_id, job?.state]);
   async function findSet(event: FormEvent) { event.preventDefault(); await lookupSet(setNumber); }
   async function lookupSet(value:string, tryExample=false) {
-    const op = ++operation.current; focusResult.current=true;
+    if(!config)return;
+    const op = ++operation.current; focusResult.current=true;setRelease(null);setRequested(false);
     setBookletOpen(false); setError(''); setNotice(''); setScene(null); setGuide(null); setSetInfo(null); setJob(null);
     if (!/^\d{4,7}$/.test(value.trim())) { setError('Enter a set number containing 4–7 digits.'); return; }
     setBusy(true);
     try {
-      const result = parseSet(await request(`/sets/${encodeURIComponent(value.trim())}`));
+      const result = parseSet(await request(`/sets/${encodeURIComponent(value.trim())}`),publicMode);
       if (op === operation.current) {
         setSetInfo(result); setBookletOpen(true);
-        if(tryExample){const example=result.guides.find(item=>item.guide_id==='alt-02');if(!example)throw new Error('The supported alternate booklet is not available. Choose an available booklet below.');await openGuide(example,result);}
+        if(publicMode&&!result.guides.some(item=>item.tutorial_available))await requestSet(result.set_number,op);
+        if(tryExample&&!publicMode){const example=result.guides.find(item=>item.guide_id==='alt-02');if(!example)throw new Error('The supported alternate booklet is not available. Choose an available booklet below.');await openGuide(example,result);}
       }
     }
     catch (e) { if(op===operation.current)setError(e instanceof Error ? e.message : 'The set could not be found.'); }
     finally { if(op===operation.current)setBusy(false); }
+  }
+  async function requestSet(number:string,op=operation.current) {
+    if(!config?.requests_enabled) return;
+    setError('');
+    try {
+      const result=await post<{set_number:string;status:string}>('/requests',{set_number:number});
+      if(result.set_number!==number||result.status!=='requested')throw new Error('Your request could not be confirmed. Please try again.');
+      if(op===operation.current){setRequested(true);setNotice(REQUEST_RECORDED);}
+    } catch(e){if(op===operation.current)setError(e instanceof Error?e.message:'Your request could not be saved. Please try again.');}
   }
   async function loadRevision(revision: string) { const op=operation.current;try{const candidate=parseScene(await request(`/reconstructions/${encodeURIComponent(revision)}/scene`));if(op===operation.current){setScene(candidate);setNotice('Loaded a cached reconstruction revision.');}}catch(e){if(op===operation.current)throw e;} }
   async function openPreparation(selected: Guide) {
@@ -72,11 +92,19 @@ export default function App() {
   async function openGuide(selected: Guide, selectedSet: SetInfo | null = setInfo) {
     if (!selectedSet) return; const op=operation.current; focusResult.current=true; setGuide(selected); setBusy(true); setError(''); setNotice(''); setJob(null);
     const path = `/sets/${selectedSet.set_number}/guides/${selected.guide_id}`;
-    try { const candidate=parseScene(await request(`${path}/scene`));if(op===operation.current){setScene(candidate);setNotice('Loaded a cached reconstruction revision.');} }
+    try {
+      if(publicMode){
+        const loader=new ReleaseLoader(await request(`${path}/release`));
+        if(loader.release.scene.set_number!==selectedSet.set_number||loader.release.scene.guide_id!==selected.guide_id)throw new Error('The published tutorial identity does not match this booklet.');
+        const candidate=await loader.window(readProgress(loader.release.scene));
+        if(op===operation.current){setRelease(loader);setScene(candidate);}
+        return;
+      }
+      const candidate=parseScene(await request(`${path}/scene`));if(op===operation.current){setScene(candidate);setNotice('Loaded a cached reconstruction revision.');} }
     catch (e) {
       if(op!==operation.current)return;
       setError(e instanceof Error ? e.message : 'The tutorial could not be opened.');
-      if (e instanceof ApiError && e.status === 409) {
+      if (!publicMode && e instanceof ApiError && e.status === 409) {
         try { const status = parseGuideStatus(await request(`${path}/status`)); if(op!==operation.current)return; if (status.job) setJob(parseJob(status.job)); if (status.latest_candidate_revision) { await loadRevision(status.latest_candidate_revision); if(op===operation.current)setError(''); } else if (!selected.tutorial_available) { setError(''); setNotice('No 3D reconstruction is available for this booklet yet.'); } }
         catch { /* Original not-ready error remains actionable; preparation is available below. */ }
       }
@@ -96,15 +124,19 @@ export default function App() {
   }
   const closeBooklet=()=>{++operation.current;returnToLookup.current=true;setBusy(false);setBookletOpen(false);setJob(null);setError('');focusResult.current=false;};
   return scene && guide ? <main className="studio-main"><Suspense fallback={<p role="status">Loading the 3D viewer…</p>}>
-      <ViewerWorkspace key={scene.revision} scene={scene} guide={guide} onScene={setScene} onClose={() => {focusResult.current=true;setBookletOpen(true);setScene(null);}} />
-    </Suspense></main> : <LandingPage setNumber={setNumber} onSetNumber={setSetNumber} onFind={findSet} onTry={()=>{setSetNumber('30669');void lookupSet('30669',true);}} busy={busy}>
+      <ViewerWorkspace key={scene.revision} publicMode={publicMode} releaseLoader={release??undefined} scene={scene} guide={guide} onScene={setScene} onClose={() => {focusResult.current=true;setBookletOpen(true);setScene(null);}} />
+    </Suspense></main> : <LandingPage setNumber={setNumber} onSetNumber={setSetNumber} onFind={findSet} onTry={()=>{setSetNumber('30669');void lookupSet('30669',true);}} busy={busy||!config} publicMode={publicMode}>
+      {configError&&<div role="alert" className="notice"><p>{configError}</p><button onClick={()=>setConfigAttempt(n=>n+1)}>Retry website connection</button></div>}
       {!setInfo&&error&&<div className="landing-workflow"><div role="alert" className="notice"><h2 ref={errorHeading} tabIndex={-1}>Set lookup</h2><p>{error}</p></div></div>}
       {setInfo&&bookletOpen&&<BookletDialog onClose={closeBooklet}>
-      {setInfo && <section className="set-result" aria-label="Set details"><div className="booklet-heading"><span className="eyebrow">LET’S BUILD SOMETHING</span><h2 id="booklet-title" ref={resultHeading} tabIndex={-1}>{setInfo.set_number} · {setInfo.name}</h2><p>Official source found. Choose your booklet to get started.</p></div><div className="booklet-options">
-        {setInfo.guides.map(item => <div className="guide-row" key={item.guide_id}><div><span className="booklet-tag">{item.tutorial_available ? '3D CANDIDATE AVAILABLE' : 'OFFICIAL SOURCE · NO 3D TUTORIAL YET'}</span><strong>{item.label}</strong><p className="muted">{item.expected_main_steps == null ? 'Instruction count has not been verified.' : `Booklet: ${item.expected_main_steps} main steps`}</p></div><button disabled={busy} onClick={() => item.tutorial_available ? openGuide(item) : openPreparation(item)}>{item.tutorial_available ? 'Open tutorial' : 'Prepare booklet'}</button></div>)}
-        <a href={setInfo.official_page} target="_blank" rel="noreferrer">View official instructions ↗</a></div></section>}
-      {error && <div role="alert" className="notice"><h2 ref={errorHeading} tabIndex={-1}>{guide ? 'Preparation needs attention' : 'Set lookup'}</h2><p>{error}</p></div>}
-      {guide && <section className="preparation" aria-label="Booklet preparation"><h2 ref={preparationHeading} tabIndex={-1}>{guide.label}</h2>
+      {setInfo && <section className="set-result" aria-label="Set details"><div className="booklet-heading"><span className="eyebrow">LET’S BUILD SOMETHING</span><h2 id="booklet-title" ref={resultHeading} tabIndex={-1}>{setInfo.set_number}{setInfo.name?` · ${setInfo.name}`:''}</h2><p>{publicMode?(setInfo.guides.some(item=>item.tutorial_available)?'Choose a ready tutorial and let’s build!':'We’re making room for more builds.'):'Official source found. Choose your booklet to get started.'}</p></div><div className="booklet-options">
+        {setInfo.guides.map(item => <div className="guide-row" key={item.guide_id}><div><span className="booklet-tag">{item.tutorial_available ? (publicMode?'READY TO BUILD':'3D CANDIDATE AVAILABLE') : (publicMode?'NOT READY YET':'OFFICIAL SOURCE · NO 3D TUTORIAL YET')}</span><strong>{item.label}</strong><p className="muted">{item.expected_main_steps == null ? (publicMode?'Official booklet':'Instruction count has not been verified.') : `Booklet: ${item.expected_main_steps} main steps`}</p></div>{(!publicMode||item.tutorial_available)&&<button disabled={busy} onClick={() => item.tutorial_available ? openGuide(item) : openPreparation(item)}>{item.tutorial_available ? 'Open tutorial' : 'Prepare booklet'}</button>}</div>)}
+        {setInfo.official_page&&<a href={setInfo.official_page} target="_blank" rel="noreferrer">View official instructions ↗</a>}</div></section>}
+      {publicMode&&notice&&<p className="notice" role="status">{notice}</p>}
+      {publicMode&&config?.requests_enabled&&!requested&&setInfo.guides.some(item=>!item.tutorial_available)&&<button disabled={busy} onClick={()=>requestSet(setInfo.set_number)}>Request this set</button>}
+      {publicMode&&config?.requests_enabled&&!requested&&setInfo.guides.length===0&&<button disabled={busy} onClick={()=>requestSet(setInfo.set_number)}>Try saving my request again</button>}
+      {error && <div role="alert" className="notice"><h2 ref={errorHeading} tabIndex={-1}>{publicMode?'Let’s try again':guide ? 'Preparation needs attention' : 'Set lookup'}</h2><p>{error}</p></div>}
+      {!publicMode&&guide && <section className="preparation" aria-label="Booklet preparation"><h2 ref={preparationHeading} tabIndex={-1}>{guide.label}</h2>
         <p>Preparation downloads and renders this official booklet. A 3D tutorial needs a separate reconstruction and review.</p>
         {notice && <p className="muted">{notice}</p>}
         {job && <div className="job-state" role="status"><strong>{job.state === 'needs_review' && !job.output_revision ? 'Booklet prepared' : job.state.replaceAll('_', ' ')}</strong><p>Stage: {job.stage.replaceAll('_', ' ')}</p>
