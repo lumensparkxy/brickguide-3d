@@ -5,6 +5,41 @@ import os
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
+from pydantic import Field
+from guide2build.core.models import StrictModel
+from guide2build.releases.models import Source, canonical
+
+CATALOGUE_MAX_ENTRIES = 1000
+CATALOGUE_MAX_BYTES = 500_000
+
+
+class PublishedEntry(StrictModel):
+    set_number: str = Field(pattern=r"^[0-9]{4,7}$")
+    guide_id: str = Field(pattern=r"^[a-z0-9-]{1,80}$")
+    release_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    source: Source
+
+
+def publication_entry(manifest):
+    source = next((s for s in manifest["sources"] if s["guide_id"] == manifest["guide_id"]), manifest["sources"][0])
+    return PublishedEntry.model_validate({k:manifest[k] for k in ("set_number", "guide_id", "release_sha256")}
+        | {"source":source}).model_dump(mode="json")
+
+
+def validate_catalogue(entries):
+    if not isinstance(entries, list) or len(entries) > CATALOGUE_MAX_ENTRIES:
+        raise ValueError("Published catalogue entry bound")
+    validated = [PublishedEntry.model_validate(e).model_dump(mode="json") for e in entries]
+    keys = [(e["set_number"], e["guide_id"]) for e in validated]
+    if len(set(keys)) != len(keys) or len(canonical(validated)) > CATALOGUE_MAX_BYTES:
+        raise ValueError("Published catalogue identity or byte bound")
+    return validated
+
+
+def replace_catalogue_entry(entries, entry):
+    key = (entry["set_number"], entry["guide_id"])
+    result = [e for e in entries if (e["set_number"], e["guide_id"]) != key] + [entry]
+    return validate_catalogue(sorted(result, key=lambda e:(e["set_number"], e["guide_id"])))
 
 
 class RequestLimit(ValueError):
@@ -29,6 +64,8 @@ class SQLiteReleaseStore:
               approved_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS release_heads(set_number TEXT, guide_id TEXT, hash TEXT NOT NULL,
               PRIMARY KEY(set_number, guide_id));
+            CREATE TABLE IF NOT EXISTS public_catalogue(set_number TEXT, guide_id TEXT, hash TEXT,
+              metadata TEXT NOT NULL, PRIMARY KEY(set_number, guide_id));
             CREATE TABLE IF NOT EXISTS release_events(id INTEGER PRIMARY KEY, set_number TEXT,
               guide_id TEXT, hash TEXT, action TEXT, at TEXT);
             ''')
@@ -54,6 +91,13 @@ class SQLiteReleaseStore:
     def requests(self):
         with self.connect() as db:
             return [dict(r) for r in db.execute('SELECT * FROM public_requests ORDER BY created_at')]
+
+    def published_catalogue(self):
+        with self.connect() as db:
+            rows = db.execute("""SELECT c.metadata FROM public_catalogue c
+                JOIN release_heads h ON c.set_number=h.set_number AND c.guide_id=h.guide_id AND c.hash=h.hash
+                JOIN release_approvals a ON a.hash=h.hash ORDER BY c.set_number,c.guide_id""").fetchall()
+            return validate_catalogue([json.loads(r[0]) for r in rows])
 
     def head(self, set_number, guide_id):
         with self.connect() as db:
@@ -96,7 +140,13 @@ class SQLiteReleaseStore:
             old = db.execute('SELECT hash FROM release_heads WHERE set_number=? AND guide_id=?', tuple(row)).fetchone()
             if (old[0] if old else None) != expected_head:
                 raise ValueError('Stale release head')
+            manifest = json.loads(db.execute('SELECT manifest FROM releases WHERE hash=?', (release_hash,)).fetchone()[0])
+            entry = publication_entry(manifest)
+            current = [json.loads(r[0]) for r in db.execute('SELECT metadata FROM public_catalogue')]
+            replace_catalogue_entry(current, entry)  # fail before changing either pointer
             db.execute('INSERT OR REPLACE INTO release_heads VALUES(?,?,?)', (*tuple(row), release_hash))
+            db.execute('INSERT OR REPLACE INTO public_catalogue VALUES(?,?,?,?)',
+                       (*tuple(row), release_hash, json.dumps(entry)))
             db.execute('INSERT INTO release_events(set_number,guide_id,hash,action,at) VALUES(?,?,?,?,?)',
                        (*tuple(row), release_hash, 'promote', utcnow()))
 
@@ -132,6 +182,10 @@ class FirestoreReleaseStore:
 
     def requests(self):
         return [x.to_dict() for x in self.request_db.collection('requests').limit(1000).stream()]
+
+    def published_catalogue(self):
+        document = self.db.collection('catalogue').document('published').get()
+        return validate_catalogue(document.to_dict().get('entries', [])) if document.exists else []
 
     def head_info(self, set_number, guide_id):
         head = self.db.collection('heads').document(f'{set_number}-{guide_id}').get()
@@ -173,8 +227,10 @@ class FirestoreReleaseStore:
             if old.exists:
                 if old.to_dict()['identity'] != {k: manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')}:
                     raise ValueError('Immutable release differs')
+                if old.to_dict().get('catalogue_entry') != publication_entry(manifest):
+                    tx.update(ref, {'catalogue_entry': publication_entry(manifest)})
                 return
-            tx.create(ref, {'identity': {k: manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')}, 'staged_at': utcnow()})
+            tx.create(ref, {'catalogue_entry': publication_entry(manifest), 'identity': {k: manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')}, 'staged_at': utcnow()})
         write(self.db.transaction())
 
     def approve(self, release_hash, identity):
@@ -197,7 +253,15 @@ class FirestoreReleaseStore:
             old = head.get(transaction=tx)
             if (old.to_dict().get('hash') if old.exists else None) != expected_head:
                 raise ValueError('Stale release head')
+            catalogue = self.db.collection('catalogue').document('published')
+            current = catalogue.get(transaction=tx)
+            entries = validate_catalogue(current.to_dict().get('entries', [])) if current.exists else []
+            entry = PublishedEntry.model_validate(release.to_dict()['catalogue_entry']).model_dump(mode='json')
+            if any(entry[k] != manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')):
+                raise ValueError('Published metadata does not bind the approved release')
+            entries = replace_catalogue_entry(entries, entry)
             tx.set(head, {'hash': release_hash, 'at': utcnow()})
+            tx.set(catalogue, {'entries': entries, 'updated_at': utcnow()})
             tx.create(self.db.collection('release_events').document(),
                       {'hash': release_hash, 'action': 'promote', 'at': utcnow()})
         write(self.db.transaction())

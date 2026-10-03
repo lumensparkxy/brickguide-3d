@@ -21,13 +21,17 @@ test('booklet popup traps focus, closes with Escape and fits narrow phones',asyn
 
 test('Part 1, Part 2 and Attach keep controls and panels fixed at every breakpoint',async({page})=>{
   test.setTimeout(60000);await mkdir(evidence,{recursive:true});await page.goto('/');
+  const response=page.waitForResponse(r=>/\/api\/v1\/(?:reconstructions\/[^/]+|sets\/30669\/guides\/alt-02)\/scene$/.test(r.url())&&r.status()===200);
   await page.getByRole('button',{name:'Try the plane tutorial'}).click();
   await expect(page.getByRole('button',{name:'Replay',exact:true})).toBeEnabled({timeout:30000});
+  const reference=await (await response).json();
   const measurements=[];
   for(const width of [1440,900,390,320]){
     await page.setViewportSize({width,height:900});
     for(const index of [2,5]){
       await page.getByLabel('Jump to instruction').selectOption(String(index));
+      // The baseline belongs to the newly selected main-step crop, not the previous page/load placeholder.
+      await expect.poll(async()=>JSON.parse(await page.locator('.source-crop canvas').getAttribute('data-panel')??'null')).toEqual(reference.steps[index].source);
       const rects=()=>page.evaluate(()=>Object.fromEntries(['.substep-navigation','.source-pane','.model-pane','.previous-button','.next-button'].map(selector=>{const r=document.querySelector(selector)!.getBoundingClientRect();return[selector,{x:r.x,y:r.y,width:r.width,height:r.height}];})));
       const initial=await rects();
       for(const name of ['Part 2','Attach','Part 1']){

@@ -133,7 +133,15 @@ def test_package_is_atomic_allowlisted_and_hash_checked(v2, tmp_path, monkeypatc
     monkeypatch.setattr('guide2build.releases.evidence.source_registry', lambda: registry)
     manifest = package_release(v2, report, root, output, preview, registry, index)
     assert verify_bundle(output)['release_sha256'] == manifest['release_sha256']
-    assert all('poses' not in s for s in manifest['step_index'])
+    assert all(not {'poses', 'visible_instance_ids', 'active_instance_ids'} & s.keys() for s in manifest['step_index'])
+    assert [s['visible_instance_count'] for s in manifest['step_index']] == [len(s.visible_instance_ids) for s in v2.steps]
+    altered = json.loads((output/'manifest.json').read_text())
+    altered['step_index'][0]['visible_instance_count'] += 1
+    altered['release_sha256'] = digest({k:v for k,v in altered.items() if k != 'release_sha256'})
+    (output/'manifest.json').write_text(json.dumps(altered))
+    with pytest.raises(ValueError, match='index differs'):
+        verify_bundle(output)
+    (output/'manifest.json').write_text(json.dumps(manifest))
     assert not (output/'source.pdf').exists()
     (output/'chunks/00000.json').write_text('{}')
     with pytest.raises(ValueError, match='bytes differ'):
@@ -179,3 +187,93 @@ def test_unverified_coverage_is_not_a_release_denominator(v2):
     index = dict(verification='automatic_unverified', sources=[v2.source_sha256], expected_step_keys=coverage_keys(v2))
     with pytest.raises(ValueError):
         verify_source_evidence(v2, validation(v2), {}, index)
+
+
+def test_source_pin_history_accepts_old_and_new_editions(v2):
+    from guide2build.releases.evidence import verify_source_evidence
+    for part in v2.instances:
+        part.part_id = '3020'
+        part.geometry_ref = 'parts/3020.dat'
+    old = v2.model_copy(deep=True)
+    new = v2.model_copy(deep=True)
+    new_hash = 'c'*64
+    new.source_sha256 = new_hash
+    new.sources[0].source_sha256 = new_hash
+    new.sections[0].source_sha256 = new_hash
+    for item in [*new.instances, *new.steps]:
+        item.source.source_sha256 = new_hash
+    registry = {'schema_version':1, 'sources':[
+        dict(old.sources[0].model_dump(), set_number=old.set_number),
+        dict(new.sources[0].model_dump(), set_number=new.set_number)]}
+    for scene in (old, new):
+        index = dict(verification='independently_verified', sources=[scene.source_sha256],
+                     expected_step_keys=coverage_keys(scene))
+        report = validation(scene).model_copy(update={'coverage_index_sha256':digest(index)})
+        verify_source_evidence(scene, report, registry, index)
+    registry['sources'].pop()
+    with pytest.raises(ValueError, match='pinned official source'):
+        verify_source_evidence(new, report, registry, index)
+
+
+def test_compact_index_grows_linearly_even_when_every_piece_is_active(v2):
+    from guide2build.releases.packaging import compact_step_index
+    from guide2build.releases.models import canonical
+    base = v2.steps[0]
+
+    def serialized_index(count):
+        result = []
+        for index in range(count):
+            cumulative = [f'piece-{piece:05d}' for piece in range(index + 1)]
+            # This transport stress fixture deliberately activates the whole cumulative assembly.
+            step = base.model_copy(update={'step_id':f'step-{index:05d}', 'main_step_number':index+1,
+                'introduced_instance_ids':[cumulative[-1]], 'active_instance_ids':cumulative,
+                'visible_instance_ids':cumulative, 'poses':{}})
+            result.append(compact_step_index(step, index // 8))
+        return result, len(canonical(result))
+
+    first, small = serialized_index(300)
+    second, large = serialized_index(600)
+    assert large < small * 2.1
+    assert sum(len(s['introduced_instance_ids']) for s in second) == 600
+    assert first[-1]['visible_instance_count'] == first[-1]['active_instance_count'] == 300
+    assert second[-1]['visible_instance_count'] == second[-1]['active_instance_count'] == 600
+    assert all('visible_instance_ids' not in s and 'active_instance_ids' not in s for s in second)
+
+
+def test_catalogue_changes_atomically_with_promotion_and_rollback(tmp_path):
+    store = SQLiteReleaseStore(tmp_path/'db')
+    identity = GoogleIdentity(APPROVER, 'unit-test-identity', True)
+    old, new = minimal_manifest(), minimal_manifest('two')
+    new['sources'][0]['official_url'] = 'https://www.lego.com/cdn/product-assets/product.bi.core.pdf/new-edition.pdf'
+    new['release_sha256'] = digest({k:v for k,v in new.items() if k != 'release_sha256'})
+    for manifest in (old, new):
+        store.stage(manifest)
+        store.approve(manifest['release_sha256'], identity)
+    assert store.published_catalogue() == []
+    store.promote(old['release_sha256'], identity)
+    assert store.published_catalogue()[0]['release_sha256'] == old['release_sha256']
+    with pytest.raises(ValueError, match='Stale'):
+        store.promote(new['release_sha256'], identity)
+    assert store.published_catalogue()[0]['release_sha256'] == old['release_sha256']
+    store.promote(new['release_sha256'], identity, old['release_sha256'])
+    assert store.published_catalogue()[0]['source']['official_url'] == new['sources'][0]['official_url']
+    store.promote(old['release_sha256'], identity, new['release_sha256'])
+    assert store.published_catalogue()[0]['source']['official_url'] == old['sources'][0]['official_url']
+
+
+def test_catalogue_limit_failure_leaves_existing_head_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setattr('guide2build.releases.store.CATALOGUE_MAX_ENTRIES', 1)
+    store = SQLiteReleaseStore(tmp_path/'db')
+    identity = GoogleIdentity(APPROVER, 'unit-test-identity', True)
+    first, second = minimal_manifest(), minimal_manifest('two')
+    second['set_number'] = '99999'
+    second['release_sha256'] = digest({k:v for k,v in second.items() if k != 'release_sha256'})
+    for manifest in (first, second):
+        store.stage(manifest)
+        store.approve(manifest['release_sha256'], identity)
+    store.promote(first['release_sha256'], identity)
+    with pytest.raises(ValueError, match='entry bound'):
+        store.promote(second['release_sha256'], identity)
+    assert store.head('99999', 'alt-02') is None
+    assert len(store.published_catalogue()) == 1
+    assert store.head('30669', 'alt-02')['release_sha256'] == first['release_sha256']

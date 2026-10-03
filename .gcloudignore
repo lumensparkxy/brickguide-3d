@@ -16,6 +16,13 @@
 !config/
 !config/sets.json
 !config/release-sources.json
+!config/placement-30669-alt-02-v3.json
+!packages/
+!packages/contracts/
+!packages/contracts/**
+!tests/
+!tests/fixtures/
+!tests/fixtures/synthetic.scene.json
 apps/**/node_modules
 apps/**/dist
 **/__pycache__

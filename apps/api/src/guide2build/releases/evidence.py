@@ -32,7 +32,8 @@ def verify_source_evidence(scene: SceneV2, validation: ReleaseValidation, regist
         raise ValueError('Trusted source pin registry is missing or invalid')
     for source in scene.sources:
         pin = next((x for x in registry['sources'] if x['set_number'] == scene.set_number
-                    and x['guide_id'] == source.guide_id), None)
+                    and x['guide_id'] == source.guide_id
+                    and x.get('source_sha256') == source.source_sha256), None)
         if not pin or any(pin.get(k) != getattr(source, k) for k in ('source_sha256', 'official_url', 'page_count')):
             raise ValueError('Scene is not bound to a pinned official source')
     if any('synthetic' in p.part_id.lower() or 'synthetic' in p.geometry_ref.lower() for p in scene.instances):

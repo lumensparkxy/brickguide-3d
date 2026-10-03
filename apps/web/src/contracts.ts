@@ -8,6 +8,8 @@ export interface PartInstance {
   mapping_status: 'candidate' | 'agent_reviewed' | 'human_reviewed';
 }
 export interface StepSnapshot {
+  /** Internal transport state, never serialized into canonical snapshots. */
+  snapshot_loaded?: boolean;
   section_id?: string; printed_step_number?: number | null;
   step_id: string; main_step_number: number; substep_label: string | null; instruction: string;
   source: SourcePanel; introduced_instance_ids: string[]; active_instance_ids: string[];

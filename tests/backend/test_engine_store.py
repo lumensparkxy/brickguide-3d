@@ -65,7 +65,9 @@ def test_campaign_gate_requires_staged_pilot(tmp_path):
     assert store.claim("one")["id"] == pilot["id"]
     store.checkpoint(pilot["id"], "one", {}, "blocked")
     assert store.claim("two") is None
-    store.staged(pilot["id"], {"test_fixture": "not actual release proof"})
+    # Simulate a previously verified stage transition; this is queue behavior, not release evidence.
+    with store.connect() as con:
+        con.execute("UPDATE engine_jobs SET state='awaiting_approval' WHERE id=?", (pilot["id"],))
     assert store.claim("two")["id"] == other["id"]
 
 

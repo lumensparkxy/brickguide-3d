@@ -103,17 +103,11 @@ def main():
         result = {"pipeline": PIPELINE, "provider_pause": store.provider_pause(), "jobs": []}
         for job in jobs:
             cp = job["checkpoint"]
-            usage, elapsed, invocations = {}, 0.0, 0
-            for record in (store.root / "jobs" / job["id"] / "calls").glob("*/*/invocation.json"):
-                value = json.loads(record.read_text())
-                elapsed += value.get("elapsed_seconds", 0)
-                invocations += 1
-                for key, amount in value.get("reported_usage", {}).items():
-                    usage[key] = usage.get(key, 0) + amount
+            from guide2build.engine.reporting import summarize_calls
+            metrics = summarize_calls(store.root / "jobs" / job["id"] / "calls")
             result["jobs"].append({key: job[key] for key in ("id", "set_number", "guide_id", "state", "error")}
                 | {"stage": cp.get("stage"), "source_sha256": cp.get("source_sha256"),
-                   "model_invocations": invocations, "model_elapsed_seconds": elapsed,
-                   "reported_usage": usage, "subscription_cost": "not_reported_by_cli",
+                   **metrics, "subscription_cost": "not_reported_by_cli",
                    "indexed_pages": len(cp.get("page_indexes", [])), "page_count": cp.get("page_count"),
                    "completed_panels": cp.get("completed_panels", 0), "total_panels": cp.get("total_panels"),
                    "evidence": str(store.root / "jobs" / job["id"]), "human_review": "not_run",
@@ -136,7 +130,9 @@ def main():
         from guide2build.engine.rendering import render_candidate
         job = store.get(args.job_id)
         directory = store.root / "jobs" / job["id"]
-        print(json.dumps(render_candidate(directory / "scene.json", directory / "geometry", args.output), indent=2))
+        report = render_candidate(directory / "scene.json", directory / "geometry", args.output)
+        store.record_render(job["id"], args.output, report)
+        print(json.dumps(report, indent=2))
     elif args.command == "validate":
         from guide2build.engine.validation import import_validation
         print(json.dumps(import_validation(store, args.job_id, args.bundle), indent=2))
@@ -158,6 +154,8 @@ def main():
         if digest(bundle) != imported["validation_bundle_sha256"]:
             raise ValueError("Independent validation bundle changed after import")
         import_validation(store, job["id"], bundle_dir)
+        scene = SceneV2.model_validate_json((directory / "validated-scene.json").read_text())
+        validation = ReleaseValidation.model_validate_json((directory / "release-validation.json").read_text())
         manifest = package_release(scene, validation, directory / "geometry", args.output,
             preview=Path(imported["preview"]),
             source_index=json.loads((directory / "verified-source-index.json").read_text()))

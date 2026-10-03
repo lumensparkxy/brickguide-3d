@@ -169,3 +169,17 @@ Scope all 19 official booklets in 10 sets. Website code may deploy after checks;
 Stages: 0 baseline/access; 1 v2 contracts/public isolation; 2 durable engine; 3 complete pilot; 4 cloud portal; 5 immutable packaging/approval; 6 all19 campaign; 7 verified deployment/operations.
 Parallel ownership: batch_engine engine/CLI/tests; release_backend public API/contracts/packaging/tests; portal_frontend UI/tests; primary infrastructure/dependencies/integration/evidence.
 Gate: never equate partial render/schema validity with complete accurate reconstruction. Continue independent work while concrete blockers remain.
+
+## Local engine and Cloud Run implementation — 3 October 2026
+
+The approved cloud/batch plan supersedes V1's earlier no-cloud scope. Preserve the existing Krishi service and default database. Tutorial publication still requires the user's explicit approval of an exact immutable version.
+
+- Stage 0: local Git, project-local SDK, authenticated approved account, billing/project inventory, 19 pinned official sources and real restricted Codex image calls verified.
+- Stages 1–2: public/private entrypoints, source-aware contracts, compact scene chunks, durable local queue, bounded delta proposals, geometry provenance, render and independent validation interfaces implemented and tested.
+- Stage 3: fresh pilot is blocked at step 3 (2/12 main steps, 5 physical pieces) on ambiguous tile orientation. No complete-scope deterministic geometry/connector checker exists; release validation fails closed. Authored reference remains separate.
+- Stage 4: dedicated databases/buckets/identities provisioned. Project budget created. First Cloud Build failed on omitted build inputs; isolated upload-context build now passes. Retry private preview and public code deployment, then inspect real browser and cloud permissions.
+- Stage 5: immutable packaging, private upload/hash verification, identity-bound approvals and pointer promotion/rollback implemented with tests. No eligible real bundle or tutorial approval exists; real publication/rollback remain unexercised.
+- Stage 6: all 19 jobs persisted. Other 18 remain queued behind pilot gate; full-set timing and full-assembly GPU benchmarks are not established.
+- Stage 7: finish public deployment checks, operations report and local checkpoint. Keep unresolved reconstruction/checker/large-context limits explicit; do not mark the overall campaign complete.
+
+Primary integrates/cloud deploys; three bounded workers own engine, portal/release and independent review. No remote Git repository or paid inference fallback was created.

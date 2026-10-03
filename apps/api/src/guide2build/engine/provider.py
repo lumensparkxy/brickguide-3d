@@ -31,6 +31,8 @@ class CodexProvider:
             raise ProviderFailure("authentication_required", "Install/authenticate the local Codex CLI first")
 
     def call(self, prompt, images, schema, evidence: Path, check=lambda: None):
+        if len(prompt.encode()) > 1_000_000:
+            raise ProviderFailure("context_limit", "Proposal prompt exceeds 1 MB; partition the assembly before retry")
         evidence.mkdir(parents=True, exist_ok=True)
         # Isolated cwd prevents repository instructions or authored coordinates entering a fresh run.
         with tempfile.TemporaryDirectory(prefix="guide2build-codex-") as temp:

@@ -55,3 +55,15 @@ The source-size/page/pixel ingestion blockers are resolved by bounded resumable 
 
 ## Actual construction benchmark — 3 October 2026
 All ten cases were attempted through fresh PDF-assisted authoring. Eleven partial booklet candidates render, but zero full tutorials or source-accuracy gates passed. Real failures include upright go-kart bumpers, a floating Viking slope, plane root/elevation mismatch, missing printed/components, Technic attachment ambiguity and single-source schema limits for Rivendell. See [TEN_SET_CONSTRUCTION_BENCHMARK.md](TEN_SET_CONSTRUCTION_BENCHMARK.md). The 100-page construction duration remains unmeasured; PDF preparation and partial-scene loading are not conversion benchmarks. No generic automatic runtime provider was run.
+
+## Current cloud/batch checkpoint — 3 October 2026
+
+This section supersedes historical no-Git/no-provider/no-cloud statements above. Local Git and cloud resources now exist, and restricted ChatGPT-authenticated Codex image inference has run successfully.
+
+1. Fresh 30669/alt-02 pilot: 2/12 main steps, 5 pieces. Step 3 is blocked on the rotation of white 25269 corner-round tile and prior attachment ambiguity. Earlier wrong-page candidate is quarantined; exact source-panel binding is enforced.
+2. A complete-scope deterministic geometry/connector checker is **not implemented**. The closed registry intentionally rejects caller-supplied pass claims. This is an engineering blocker, not a request for the user to approve uncertain geometry.
+3. All other 18 campaign booklets are queued behind the pilot gate. Largest assemblies may exceed the bounded 400 KB current-state prompt; spatial partitioning remains unimplemented and unbenchmarked. Rivendell continuation contracts have tests but no completed three-book reconstruction.
+4. No eligible tutorial bundle, per-version user approval, publication or real tutorial rollback exists. Passing transport/security tests is not an accepted reconstruction.
+5. Native-M3 full-assembly GPU/frame-time/cold-warm benchmarks cannot be measured without complete assemblies. Latest automatic partial renders use SwiftShader; no hardware-GPU claim.
+
+Automatic approval review rejected an extra temporary portal impersonation permission. No grant was added or bypassed; IAM policy inspection and service behavior are the alternative checks. Existing approved uploader impersonation was tested and cannot read the release/default databases.

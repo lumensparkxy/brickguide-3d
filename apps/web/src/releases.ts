@@ -10,8 +10,8 @@ export function parseConfig(value: unknown): PortalConfig {
   return config;
 }
 interface Chunk { index:number; path:string; sha256:string; bytes:number; step_ids:string[]; }
-interface IndexedStep extends Omit<StepSnapshot,'poses'> { chunk_index:number; }
-interface Release { scene:SceneManifest; chunks:Chunk[]; stepIndex:IndexedStep[]; assetBase:string; }
+interface IndexedStep extends Omit<StepSnapshot,'poses'|'visible_instance_ids'|'active_instance_ids'|'snapshot_loaded'> { chunk_index:number; visible_instance_count:number; active_instance_count:number; }
+interface Release { scene:SceneManifest; chunks:Chunk[]; stepIndex:IndexedStep[]; assetBase:string; introducedAt:Record<string,number>; }
 const error = (message:string):never => {throw new Error(`Invalid tutorial release: ${message}`);};
 const hash = (value:unknown):value is string => typeof value==='string' && /^[a-f0-9]{64}$/.test(value);
 const official = (value:unknown) => {try {const url=new URL(String(value));return url.protocol==='https:'&&(url.hostname==='lego.com'||url.hostname.endsWith('.lego.com'));}catch{return false;}};
@@ -45,21 +45,24 @@ export function parseRelease(value:unknown):Release {
   if(!Array.isArray(data.chunks)||!data.chunks.length||!Array.isArray(data.step_index)||!data.step_index.length)error('empty chunks');
   const chunks:Chunk[]=data.chunks;
   chunks.forEach((chunk,index)=>{if(chunk.index!==index||!/^chunks\/[a-zA-Z0-9._-]+\.json$/.test(chunk.path)||!hash(chunk.sha256)||!Number.isInteger(chunk.bytes)||chunk.bytes<1||chunk.bytes>32*1024*1024||!Array.isArray(chunk.step_ids)||!chunk.step_ids.length)error('chunk metadata');});
+  const introducedAt:Record<string,number>=Object.create(null);
   const introduced=new Set<string>(),stepIds=new Set<string>(),closedSections=new Set<string>();let priorSection='',priorMain=0,priorOrder=-1;const sectionOrder=[...sections.keys()];
   const stepIndex:IndexedStep[]=data.step_index.map((raw:any,index:number)=>{
+    if(!raw||typeof raw!=='object')error('step index');
+    if('poses' in raw||'visible_instance_ids' in raw||'active_instance_ids' in raw||'snapshot_loaded' in raw)error('noncompact step index');
     const step=adapted(raw,index) as unknown as IndexedStep; panel(step.source);
     if(typeof step.section_id!=='string'||sections.get(step.section_id)!==step.source.source_sha256||stepIds.has(step.step_id)||typeof step.step_id!=='string'||!step.step_id||typeof step.instruction!=='string'||!(step.substep_label===null||typeof step.substep_label==='string')||!['add_parts','build_subassembly','attach_subassembly','inspect'].includes(step.action)||!(step.assembly_group_id===null||typeof step.assembly_group_id==='string')||!Number.isInteger(step.chunk_index)||!chunks[step.chunk_index]?.step_ids.includes(step.step_id)||!(raw.main_step_number===null||Number.isInteger(raw.main_step_number)&&raw.main_step_number>0))error('step index');
     if(priorSection!==step.section_id){const order=sectionOrder.indexOf(step.section_id!);if(order<priorOrder||closedSections.has(step.section_id!))error('section order');priorOrder=order;if(priorSection)closedSections.add(priorSection);priorSection=step.section_id!;priorMain=0;}
     if(raw.main_step_number!==null){if(raw.main_step_number<priorMain)error('printed step order');priorMain=raw.main_step_number;}
-    for(const list of [step.introduced_instance_ids,step.visible_instance_ids,step.active_instance_ids])if(!Array.isArray(list)||new Set(list).size!==list.length||list.some(id=>!ids.has(id)))error('instance references');
-    for(const id of step.introduced_instance_ids){if(introduced.has(id))error('duplicate introduction');introduced.add(id);}
-    if(step.visible_instance_ids.some(id=>!introduced.has(id))||[...step.active_instance_ids,...step.introduced_instance_ids].some(id=>!step.visible_instance_ids.includes(id)))error('visibility');
+    const list=step.introduced_instance_ids;if(!Array.isArray(list)||new Set(list).size!==list.length||list.some(id=>!ids.has(id)))error('instance references');
+    for(const id of list){if(introduced.has(id))error('duplicate introduction');introduced.add(id);introducedAt[id]=index;}
+    if(!Number.isInteger(step.visible_instance_count)||step.visible_instance_count<list.length||step.visible_instance_count>introduced.size||!Number.isInteger(step.active_instance_count)||step.active_instance_count<0||step.active_instance_count>step.visible_instance_count)error('snapshot counts');
     stepIds.add(step.step_id);return step;
   });
   if(introduced.size!==ids.size||chunks.flatMap(c=>c.step_ids).join('\0')!==stepIndex.map(s=>s.step_id).join('\0'))error('coverage');
   // Empty poses are transport placeholders only. The workspace never renders an unloaded snapshot.
-  const scene:SceneManifest={schema_version:'1.0',set_number:data.set_number,guide_id:data.guide_id,revision:data.revision,source_sha256:data.source_sha256,coordinate_system:data.coordinate_system,status:data.status,geometry_check:data.geometry_check,connector_check:data.connector_check,physical_build_check:data.physical_build_check,instances:data.instances,reviews:[],sources:data.sources,geometry_base_url:geometry,steps:stepIndex.map(({chunk_index,...step})=>({...step,poses:{}}))};
-  return freeze({scene,chunks,stepIndex,assetBase:base});
+  const scene:SceneManifest={schema_version:'1.0',set_number:data.set_number,guide_id:data.guide_id,revision:data.revision,source_sha256:data.source_sha256,coordinate_system:data.coordinate_system,status:data.status,geometry_check:data.geometry_check,connector_check:data.connector_check,physical_build_check:data.physical_build_check,instances:data.instances,reviews:[],sources:data.sources,geometry_base_url:geometry,steps:stepIndex.map(({chunk_index,visible_instance_count,active_instance_count,...step})=>({...step,visible_instance_ids:[],active_instance_ids:[],poses:{},snapshot_loaded:false}))};
+  return freeze({scene,chunks,stepIndex,assetBase:base,introducedAt});
 }
 const canonical=(value:any):string=>JSON.stringify(value&&typeof value==='object'?Array.isArray(value)?value.map(v=>JSON.parse(canonical(v))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])):value);
 export class ReleaseLoader {
@@ -84,11 +87,14 @@ export class ReleaseLoader {
         const step=adapted(raw,stepIndex) as unknown as StepSnapshot;
         const {section_id,printed_step_number,...v1}=step;
         if(!validateStep(v1))error('snapshot shape');
-        const {poses,...metadata}=step;const {chunk_index,...expected}=this.release.stepIndex[stepIndex];
+        const {poses,visible_instance_ids,active_instance_ids,...labels}=step;const {chunk_index,...expected}=this.release.stepIndex[stepIndex];
+        const metadata={...labels,visible_instance_count:visible_instance_ids.length,active_instance_count:active_instance_ids.length};
         if(canonical(metadata)!==canonical(expected))error('snapshot differs from index');
-        if(Object.keys(poses).length!==step.visible_instance_ids.length||Object.keys(poses).some(id=>!step.visible_instance_ids.includes(id)))error('snapshot poses');
+        const visible=new Set(visible_instance_ids),active=new Set(active_instance_ids);
+        if(visible.size!==visible_instance_ids.length||active.size!==active_instance_ids.length||visible_instance_ids.some(id=>!Object.hasOwn(this.release.introducedAt,id)||this.release.introducedAt[id]>stepIndex)||[...active_instance_ids,...step.introduced_instance_ids].some(id=>!visible.has(id)))error('snapshot visibility');
+        if(Object.keys(poses).length!==visible.size||Object.keys(poses).some(id=>!visible.has(id)))error('snapshot poses');
         for(const pose of Object.values(poses))if(![...pose.position_ldu,...pose.quaternion_xyzw].every(Number.isFinite)||Math.abs(Math.hypot(...pose.quaternion_xyzw)-1)>1e-5)error('rotation');
-        return step;
+        return {...step,snapshot_loaded:true};
       }));
     })();this.cache.set(index,task);task.catch(()=>this.cache.delete(index));return task;
   }

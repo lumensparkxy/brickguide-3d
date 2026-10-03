@@ -20,7 +20,9 @@ test('plays every real instruction slowly, freezes on pause, and reaches the exa
   await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','playing');
   // Starting pieces now highlight in place; they must not imply a guessed attachment direction.
   await expect(page.locator('.viewport')).toHaveAttribute('data-placement-mode','highlight');
-  await button(page,'Pause build').click();await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','paused');
+  await button(page,'Pause build').click();await expect(button(page,'Resume build')).toBeVisible();
+  // A pause can land in the stationary hold between steps; both states must freeze the same snapshot.
+  await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state',/^(paused|idle)$/);
   const frozen=await canvas.screenshot(modelOnly);await page.waitForTimeout(700);expect(frozen.equals(await canvas.screenshot(modelOnly))).toBe(true);
   await expect(page.getByLabel('Jump to instruction')).toHaveValue('0');
   await page.screenshot({path:`${evidence}/paused.png`,fullPage:true});

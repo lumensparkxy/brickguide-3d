@@ -51,21 +51,47 @@ def test_request_admission_bounds_duplicate_database_reads(tmp_path):
     assert c.post('/api/v1/requests',json={'set_number':'30669'}).status_code == 429
 
 
-def test_firestore_reads_are_cached_only_for_known_guides(tmp_path, monkeypatch):
+def test_firestore_catalogue_is_cached_and_unknown_searches_never_read_heads(tmp_path, monkeypatch):
     from guide2build.releases.store import FirestoreReleaseStore
     store = object.__new__(FirestoreReleaseStore)
     calls = []
-    store.head_info = lambda s,g: calls.append((s,g)) or None
+    store.published_catalogue = lambda: calls.append('catalogue') or []
     store.head = lambda s,g: calls.append((s,g,'full')) or None
     now = [100.0]
     monkeypatch.setattr('guide2build.public.time.monotonic', lambda:now[0])
     c = TestClient(create_app(store, web_dist=tmp_path/'missing'))
     c.get('/api/v1/sets/30669')
     c.get('/api/v1/sets/30669')
-    assert len(calls) == 3
+    assert calls == ['catalogue']
     c.get('/api/v1/sets/99999/guides/unknown/release')
-    assert len(calls) == 3
+    assert calls == ['catalogue']
     now[0] += 31
     c.get('/api/v1/sets/30669')
-    assert len(calls) == 6
+    assert calls == ['catalogue', 'catalogue']
     assert c.get('/api/v1/sets/30669').headers['Cache-Control'] == 'public,max-age=30'
+
+
+def test_new_approved_set_is_discoverable_without_changing_container_catalogue(tmp_path):
+    from test_releases import minimal_manifest
+    from guide2build.releases.models import digest
+    from guide2build.releases.auth import GoogleIdentity, APPROVER
+    store = SQLiteReleaseStore(tmp_path/'db')
+    catalogue = tmp_path/'catalogue.json'
+    catalogue.write_text('{"sets":[]}')
+    c = TestClient(create_app(store, catalogue_path=catalogue, web_dist=tmp_path/'missing'))
+    manifest = minimal_manifest()
+    manifest['set_number'] = '99999'
+    manifest['sources'][0]['official_url'] = 'https://www.lego.com/cdn/product-assets/product.bi.core.pdf/approved.pdf'
+    manifest['release_sha256'] = digest({k:v for k,v in manifest.items() if k != 'release_sha256'})
+    store.stage(manifest)
+    assert c.get('/api/v1/sets/99999').json()['status'] == 'not_ready'
+    identity = GoogleIdentity(APPROVER, 'unit-test-identity', True)
+    store.approve(manifest['release_sha256'], identity)
+    assert c.get('/api/v1/sets/99999').json()['guides'] == []
+    store.promote(manifest['release_sha256'], identity)
+    item = c.get('/api/v1/sets/99999').json()
+    assert item['name'] == 'Set 99999'
+    assert item['guides'][0]['tutorial_available'] is True
+    assert item['guides'][0]['pdf_url'] == manifest['sources'][0]['official_url']
+    assert item['official_page'] == manifest['sources'][0]['official_url']
+    assert c.get(item['guides'][0]['release_manifest_url']).json()['release_sha256'] == manifest['release_sha256']

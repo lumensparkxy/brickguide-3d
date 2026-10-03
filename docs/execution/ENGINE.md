@@ -51,6 +51,13 @@ are reported only when the CLI actually returns them. Subscription monetary cost
 Automatic source indexing remains `automatic_unverified`; matching a known 12-step count is not proof of every
 substep or a complete reconstruction. A page is not a step.
 
+Proposals are append-only deltas: new sections, new physical instances and new snapshots with only new/moved
+pose updates. The engine reconstructs unchanged poses and preserves historical snapshots deterministically.
+Model context contains current physical IDs/poses, not full snapshot history. Source indexing sends only the
+previous page and section names; rendered review sends only page-local changes. Current-state context is capped
+at 400 KB and total prompts at 1 MB. Assemblies beyond that need spatial partitioning; the largest sets have
+not been validated and are not silently sent as unbounded full-history prompts.
+
 Fresh snapshots are bound to the requested source page and printed main step, use stable physical IDs and
 cannot rewrite earlier checkpointed snapshots. Rivendell books 2/3 require a validated staged predecessor and
 carry forward its sources, sections and physical IDs; they do not start as unrelated models. Other alternate
@@ -78,12 +85,19 @@ qualify as review passes.
   format; it must agree with the trusted source registry and candidate coverage.
 - `connector_report`: matching scene hash, named/versioned deterministic checker, pass/fail/unsupported,
   supported physical IDs and hash-verified evidence files. Every physical instance must be supported.
-- `assembly_report`: matching scene hash, named agent/human reviewer, matched-camera source-comparison report,
+- `assembly_report`: matching scene hash, named agent reviewer, source/render comparison report (no unverified camera-matching claim),
   actual render report file and one passing source-page/render-image comparison for every microstep.
 
 Relative evidence files are root-confined, byte-bounded and hash checked. Compared source-page hashes must
 match the locally retained official rasters. Source PDF receipts and the entire geometry closure are verified
-again. An actor label in this local validation report is **not** authenticated tutorial publication approval.
+again. Browser reports must match an engine-recorded render receipt. Human actor labels are rejected here;
+authenticated tutorial publication approval remains a separate operation.
+
+**Current deterministic-checker gate:** the closed registry has no general assembly checker. The legacy
+authored first-four-step helper cannot certify complete automatic scenes and is deliberately not registered.
+Validation rejects unsupported checker IDs and reruns registered code; caller-provided pass flags and arbitrary
+evidence files can never grant geometry/connector success. Implementing and independently testing a general
+checker remains required before the pilot or any other full tutorial can pass this gate.
 
 Successful import writes a separate `validated-scene.json` (only deterministic check flags differ), release
 validation and an immutable-by-hash validation receipt. The raw candidate remains unchanged. Packaging checks
@@ -108,3 +122,17 @@ for the retry's final state. This experiment does not establish a complete tutor
 
 The old partial screenshot in `var/evidence/engine-pilot-render` binds the quarantined candidate hash and must
 not be used as validation of a later revision. No human review, physical build or tutorial publication occurred.
+
+Final bounded pilot retry: 2 of 12 main steps / 2 microsteps / 5 physical parts retained, both bound to the
+correct official page. Step 3 stopped on the model's unresolved 25269 corner-round tile rotation. The delta
+adapter's real structured call also returned that explicit blocker; it did not invent an attachment.
+`var/evidence/engine-pilot-benchmark.json` records 16 model calls and 781.253 seconds of active model-call time
+across indexing, failed proposals and development retries (332,807 input / 17,989 output tokens reported by
+CLI, with reasoning tokens reported separately). This is a development experiment, not end-to-end completed-set
+latency or a basis for extrapolating 100-page completion time. Monetary subscription usage is not reported.
+
+The valid partial candidate has canonical hash `bafb5402e76e8a18e67a8986c71a1655d866fa6756a0345ba515d28032b2a2a7`.
+Actual screenshots for both steps and rendering counters are retained under
+`var/evidence/engine-candidate-render-bafb5402e76e8a18e67a8986c71a1655d866fa6756a0345ba515d28032b2a2a7/`.
+They were visually inspected against the official page, but no connector or completed-assembly pass was granted.
+The browser reported SwiftShader and no GPU timer support; native GPU benchmark status remains `not_run`.

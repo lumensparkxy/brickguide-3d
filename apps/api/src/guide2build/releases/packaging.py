@@ -11,6 +11,13 @@ from guide2build.releases.models import SceneV2, ReleaseValidation, canonical, d
 SAFE = re.compile(r'^(parts/(?:s/)?|p/(?:8/|48/)?)[a-z0-9_-]+\.dat$')
 
 
+def compact_step_index(step, chunk_index: int) -> dict:
+    """Navigation metadata is linear in steps + unique introductions, never cumulative state."""
+    return dict(step.model_dump(mode='json', exclude={'poses', 'visible_instance_ids', 'active_instance_ids'}),
+                visible_instance_count=len(step.visible_instance_ids),
+                active_instance_count=len(step.active_instance_ids), chunk_index=chunk_index)
+
+
 def geometry_closure(root: Path, refs: list[str]) -> dict[str, bytes]:
     root = root.resolve()
     manifest = json.loads((root / 'provenance.json').read_text())
@@ -120,8 +127,7 @@ def package_release(scene: SceneV2, validation: ReleaseValidation, geometry_root
         files[path] = data
         metadata['chunks'].append(dict(index=index, path=path, sha256=hashlib.sha256(data).hexdigest(),
                                        bytes=len(data), step_ids=[s.step_id for s in steps]))
-        metadata['step_index'].extend(dict(s.model_dump(mode='json', exclude={'poses'}), chunk_index=index)
-                                      for s in steps)
+        metadata['step_index'].extend(compact_step_index(s, index) for s in steps)
     # Only typed validation summary, never private evidence paths or prompts.
     files['validation.json'] = canonical(validation)
     files['coverage.json'] = canonical(coverage)
@@ -220,7 +226,7 @@ def validate_scene_manifest(manifest: dict, steps: list[dict], report: bytes, so
         receipt = manifest['files'].get(chunk['path'])
         if not receipt or any(receipt[k] != chunk[k] for k in ('bytes', 'sha256')):
             raise ValueError('Chunk receipt mismatch')
-        expected_index.extend(dict(s.model_dump(mode='json', exclude={'poses'}), chunk_index=index) for s in selection)
+        expected_index.extend(compact_step_index(s, index) for s in selection)
         offset += len(selection)
     if offset != len(scene.steps) or expected_index != manifest['step_index']:
         raise ValueError('Lightweight step index differs from canonical snapshots')

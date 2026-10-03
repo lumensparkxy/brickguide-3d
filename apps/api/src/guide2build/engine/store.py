@@ -8,7 +8,7 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-PIPELINE = "codex-source-v1"
+PIPELINE = "codex-source-delta-v2"
 TERMINAL = {"blocked", "failed", "cancelled", "awaiting_approval"}
 
 
@@ -184,27 +184,63 @@ class EngineStore:
             row = con.execute("SELECT * FROM engine_jobs WHERE id=?", (job_id,)).fetchone()
             if not row or (row["owner"] and row["lease_until"] > time.time()):
                 raise ValueError("Cannot stage unknown or actively leased job")
+            from ..releases.packaging import verify_manifest
+            verify_manifest(manifest)
+            if manifest["set_number"] != row["set_number"] or manifest["guide_id"] != row["guide_id"]:
+                raise ValueError("Staged manifest identity does not match the queued job")
             checkpoint = json.loads(row["checkpoint"])
+            if manifest["source_sha256"] != checkpoint.get("candidate", {}).get("source_sha256"):
+                raise ValueError("Staged manifest does not bind the job source")
             checkpoint["staged_manifest"] = manifest
             con.execute("UPDATE engine_jobs SET state='awaiting_approval',checkpoint=?,error=NULL WHERE id=?",
                         (json.dumps(checkpoint), job_id))
             self.event(con, job_id, "awaiting_approval", {"publication": "not_performed"})
+            if row["set_number"] == "10316" and row["guide_id"] in {"booklet-01", "booklet-02"}:
+                successor = "booklet-02" if row["guide_id"] == "booklet-01" else "booklet-03"
+                revision = json.loads(row["config"]).get("revision")
+                for waiting in con.execute("SELECT * FROM engine_jobs WHERE set_number='10316' AND guide_id=? AND state='blocked'", (successor,)).fetchall():
+                    error = json.loads(waiting["error"]) if waiting["error"] else {}
+                    if error.get("code") == "prior_booklet_required" and json.loads(waiting["config"]).get("revision") == revision:
+                        con.execute("UPDATE engine_jobs SET state='queued',error=NULL WHERE id=?", (waiting["id"],))
+                        self.event(con, waiting["id"], "dependency_available", {"predecessor_job_id": job_id})
 
     def reset_candidate(self, job_id):
-        """Explicit retry correction: quarantine invalid proposals, retain original raw calls/indexes."""
-        job = self.get(job_id)
-        if job["owner"] and job["lease_until"] > time.time():
-            raise ValueError("Cannot reset an active candidate")
-        directory = self.root / "jobs" / job_id
-        quarantine = directory / "rejected" / uuid.uuid4().hex
-        quarantine.mkdir(parents=True, exist_ok=True)
-        for name in ("scene.json", "validated-scene.json", "release-validation.json", "validation-import.json"):
-            source = directory / name
-            if source.exists():
-                source.replace(quarantine / name)
-        checkpoint = job["checkpoint"]
-        for key in ("candidate", "completed_panels", "page_reviews", "staged_manifest"):
-            checkpoint.pop(key, None)
+        """Reserve a maintenance transaction so a watcher cannot claim during file quarantine."""
         with self.connect() as con:
+            con.execute("BEGIN IMMEDIATE")
+            row = con.execute("SELECT * FROM engine_jobs WHERE id=?", (job_id,)).fetchone()
+            if not row:
+                raise KeyError(job_id)
+            job = self.decode(row)
+            if (job["owner"] and job["lease_until"] > time.time()) or job["state"] == "awaiting_approval":
+                raise ValueError("Cannot reset an active or staged candidate; enqueue a new revision")
+            directory = self.root / "jobs" / job_id
+            quarantine = directory / "rejected" / uuid.uuid4().hex
+            quarantine.mkdir(parents=True, exist_ok=True)
+            for name in ("scene.json", "validated-scene.json", "release-validation.json", "validation-import.json"):
+                source = directory / name
+                if source.exists():
+                    source.replace(quarantine / name)
+            checkpoint = job["checkpoint"]
+            for key in ("candidate", "completed_panels", "page_reviews", "staged_manifest", "render_directory",
+                        "render_scene_sha256", "render_report_sha256"):
+                checkpoint.pop(key, None)
             con.execute("UPDATE engine_jobs SET checkpoint=? WHERE id=?", (json.dumps(checkpoint), job_id))
             self.event(con, job_id, "candidate_quarantined", {"reason": "Explicit reset; retained raw evidence"})
+
+    def record_render(self, job_id, output, report):
+        from ..releases.models import SceneV2, digest
+        directory = self.root / "jobs" / job_id
+        with self.connect() as con:
+            con.execute("BEGIN IMMEDIATE")
+            row = con.execute("SELECT * FROM engine_jobs WHERE id=?", (job_id,)).fetchone()
+            if not row or (row["owner"] and row["lease_until"] > time.time()):
+                raise ValueError("Cannot attach external render to unknown or actively changing job")
+            scene = SceneV2.model_validate_json((directory / "scene.json").read_text())
+            if report["scene_sha256"] != digest(scene):
+                raise ValueError("Candidate changed during rendering")
+            checkpoint = json.loads(row["checkpoint"])
+            checkpoint.update(render_directory=str(output.resolve()), render_scene_sha256=digest(scene),
+                              render_report_sha256=hashlib.sha256((output / "report.json").read_bytes()).hexdigest())
+            con.execute("UPDATE engine_jobs SET checkpoint=? WHERE id=?", (json.dumps(checkpoint), job_id))
+            self.event(con, job_id, "render_recorded", {"scene_sha256": digest(scene)})

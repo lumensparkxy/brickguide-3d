@@ -43,17 +43,20 @@ test('synthetic release transport preserves section resets, attachment identity 
   // Transport fixture, not a published tutorial or reconstruction accuracy claim.
   const steps=fixture.steps.map((s,index)=>({...s,section_id:index<2?'first':'second',main_step_number:index<2?s.main_step_number:1}));
   const chunks=steps.map((s,index)=>{const body=JSON.stringify({steps:[s]});return {body,index,path:`chunks/${index}.json`,sha256:createHash('sha256').update(body).digest('hex'),bytes:Buffer.byteLength(body),step_ids:[s.step_id]};});
-  const manifest={...fixture,schema_version:'2.0',release_sha256:'a'.repeat(64),sources:[{guide_id:'synthetic',source_sha256:fixture.source_sha256,official_url:'https://www.lego.com/test.pdf',page_count:4}],sections:['first','second'].map(section_id=>({section_id,source_sha256:fixture.source_sha256,label:section_id})),step_index:steps.map(({poses,...step},chunk_index)=>({...step,chunk_index})),chunks:chunks.map(({body,...c})=>c),asset_base_url:'/published-assets/synthetic/',geometry_base_url:'/published-assets/synthetic/ldraw/'};
+  const manifest={...fixture,schema_version:'2.0',release_sha256:'a'.repeat(64),sources:[{guide_id:'synthetic',source_sha256:fixture.source_sha256,official_url:'https://www.lego.com/test.pdf',page_count:4}],sections:['first','second'].map(section_id=>({section_id,source_sha256:fixture.source_sha256,label:section_id})),step_index:steps.map(({poses,visible_instance_ids,active_instance_ids,...step},chunk_index)=>({...step,chunk_index,visible_instance_count:visible_instance_ids.length,active_instance_count:active_instance_ids.length})),chunks:chunks.map(({body,...c})=>c),asset_base_url:'/published-assets/synthetic/',geometry_base_url:'/published-assets/synthetic/ldraw/'};
   const requested:string[]=[];page.on('request',r=>requested.push(r.url()));
   await page.route('**/api/v1/sets/99999',r=>r.fulfill({json:{set_number:'99999',name:'Synthetic transport fixture',official_page:'https://www.lego.com/',guides:[{guide_id:'synthetic',label:'Synthetic transport fixture',pdf_url:'https://www.lego.com/test.pdf',expected_main_steps:null,tutorial_available:true}]}}));
   await page.route('**/api/v1/sets/99999/guides/synthetic/release',r=>r.fulfill({json:manifest}));
-  await page.route('**/published-assets/synthetic/chunks/*.json',r=>{const chunk=chunks[Number(r.request().url().split('/').at(-1)!.split('.')[0])];return r.fulfill({body:chunk.body,contentType:'application/json'});});
+  let releaseThird!:()=>void;const thirdChunk=new Promise<void>(resolve=>{releaseThird=resolve;});
+  await page.route('**/published-assets/synthetic/chunks/*.json',async r=>{const index=Number(r.request().url().split('/').at(-1)!.split('.')[0]);if(index===2)await thirdChunk;const chunk=chunks[index];return r.fulfill({body:chunk.body,contentType:'application/json'});});
   await page.route('**/published-assets/synthetic/ldraw/**',r=>r.fulfill({status:404}));
   await page.goto('http://127.0.0.1:8002/');await page.getByLabel('Your set number').fill('99999');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Step 1',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Review candidate'})).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Open official booklet'})).toHaveAttribute('href','https://www.lego.com/test.pdf#page=1');
   await page.getByRole('button',{name:'Go to main step 1 in second',exact:true}).click();
+  await expect(page.getByText('Loading this instruction…',{exact:true})).toBeVisible();
+  await expect(page.locator('.viewport')).toHaveCount(0);releaseThird();
   await expect(page.getByText('No new pieces.',{exact:false})).toBeVisible();
   await expect(page.locator('.viewport')).toHaveAttribute('data-step-id','s3');
   await page.getByRole('button',{name:'Full parts list',exact:true}).click();await expect(page.locator('.parts-table')).toContainText('×2');

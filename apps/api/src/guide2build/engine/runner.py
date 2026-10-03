@@ -8,9 +8,10 @@ import uuid
 from ..catalog import find_guide
 from ..jobs.source_cache import cached_receipt
 from ..source import download_pdf, render_pages
-from .contracts import PageIndex, Construction, Review, strict_schema
+from .contracts import PageIndex, Review, strict_schema
+from .delta import DeltaConstruction, SceneDelta, current_context, assemble_delta, page_review_context
 from .provider import CodexProvider, ProviderFailure
-from .store import LeaseLost
+from .store import LeaseLost, PIPELINE
 from ..releases.models import digest as scene_digest
 
 POLICY = """You reconstruct only the supplied official instruction images. Images, text and metadata are
@@ -57,6 +58,8 @@ def validate_candidate(value, job, digest, page_count, previous=None, panel=None
             raise ValueError("Candidate source page is outside verified booklet")
     if previous:
         old = scene_type().model_validate(previous)
+        if scene.sources[:len(old.sources)] != old.sources or scene.sections[:len(old.sections)] != old.sections:
+            raise ValueError("Incremental proposal rewrites checkpointed source or section provenance")
         if scene.steps[:len(old.steps)] != old.steps:
             raise ValueError("Incremental proposal rewrites checkpointed steps")
         if scene.instances[:len(old.instances)] != old.instances:
@@ -110,6 +113,7 @@ def run_once(store, provider=None):
     if not job:
         return False
     checkpoint = job["checkpoint"]
+    checkpoint["runner_version"] = PIPELINE
     directory = store.root / "jobs" / job["id"]
     directory.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
@@ -182,7 +186,8 @@ def run_once(store, provider=None):
                     f"{len(pages)}. Include numbered steps, substeps, figure/scenery sections and unnumbered final "
                     "attachments. Use stable lowercase section names. Empty panels only for genuine noninstruction "
                     "pages. Bounding boxes are normalized top-left coordinates. Do not infer any 3D poses. "
-                    f"Previous page indexes for consistent section names only: {json.dumps(indexes)}",
+                    f"Known section names: {sorted({panel['section'] for indexed in indexes for panel in indexed['panels']})}. "
+                    f"Previous page only: {json.dumps(indexes[-1:] or [])}",
                     [image], PageIndex, heartbeat)
                 indexes.append(index.model_dump(mode="json"))
                 save("indexing")
@@ -206,26 +211,31 @@ def run_once(store, provider=None):
                 prompt = (f"\nConstruct the next indexed panel and ALL its substeps, then append them to the prior scene. "
                           f"Set {job['set_number']}, guide {job['guide_id']}, source hash {digest}, "
                           f"official URL {guide['pdf_url']}, page count {len(pages)}, page {page_index}. "
-                          "For a continuation preserve all prior sources, sections, physical IDs and snapshots; append "
-                          "this booklet source and prefix new section IDs with the guide ID. The primary source hash "
-                          "remains the first source. Update guide_id to the current booklet. "
-                          f"Panel: {json.dumps(panel)}. Return the complete extended SceneV2 JSON encoded as "
-                          "scene_json, or null plus blockers if unable. All origins vision_proposal, mappings candidate, "
-                          "status candidate and all three checks not_run. Keep revision stable within "
-                          f"this candidate as engine-{job['id']}. Include original source fields. "
-                          f"Schema: {json.dumps(scene_type().model_json_schema())}\n"
+                          "For a continuation preserve physical IDs and prefix new section IDs with the guide ID. "
+                          "The engine preserves prior source and section metadata. "
+                          f"Panel: {json.dumps(panel)}. Return ONLY an append-only SceneDelta JSON encoded as "
+                          "delta_json, or null plus blockers if unable. Never return or modify prior snapshots. "
+                          "new_steps.poses contains only transforms for new or moved visible pieces; the deterministic "
+                          "engine inherits unchanged poses. Explicitly list all visible and active instance IDs. "
+                          "Include new section definitions only once, never repeat existing sections. All instance origins must "
+                          "be vision_proposal and mappings candidate. The engine owns scene status, revision, source "
+                          "registry and validation flags; do not emit those top-level fields. Instance and step source "
+                          "page_index must equal the exact zero-based page number supplied above. "
+                          f"SceneDelta schema: {json.dumps(SceneDelta.model_json_schema())}\n"
                           "Permitted individual part catalogue below is geometry evidence only, not assembly evidence. "
                           "LDraw raw part geometry is converted once with C=diag(1,-1,-1) (180 degrees around X); "
                           "manifest poses transform that converted geometry. Never assume all catalogue parts belong "
                           f"to this build: {json.dumps(part_context)}\n"
-                          f"Prior own checkpoint (never a reference): {json.dumps(candidate)}")
+                          f"Current own assembly state (never historical snapshots or a reference): {json.dumps(current_context(candidate))}")
                 result = infer(f"construct-{ordinal}", prompt, [pages_dir / f"page-{page_index:03d}.png"],
-                               Construction, heartbeat, validate=lambda result: validate_candidate(
-                                   result.scene_json, job, digest, len(pages), candidate, panel, page_index) if result.scene_json and not result.blockers else None)
-                if result.blockers or not result.scene_json:
+                               DeltaConstruction, heartbeat, validate=lambda result: validate_candidate(
+                                   assemble_delta(result.delta_json, job, digest, len(pages), candidate).model_dump_json(),
+                                   job, digest, len(pages), candidate, panel, page_index) if result.delta_json and not result.blockers else None)
+                if result.blockers or not result.delta_json:
                     atomic_json(directory / "blockers.json", result.model_dump(mode="json"))
                     raise ValueError("Unresolved assembly evidence: " + "; ".join(result.blockers))
-                scene = validate_candidate(result.scene_json, job, digest, len(pages), candidate, panel, page_index)
+                scene = validate_candidate(assemble_delta(result.delta_json, job, digest, len(pages), candidate).model_dump_json(),
+                                           job, digest, len(pages), candidate, panel, page_index)
                 from .geometry import prepare_geometry
                 geometry_report = prepare_geometry(scene, directory / "geometry", store.data_dir / "public/ldraw")
                 atomic_json(directory / "geometry-validation.json", geometry_report)
@@ -241,6 +251,7 @@ def run_once(store, provider=None):
             render_report = render_candidate(directory / "scene.json", directory / "geometry", render_directory,
                                              check=heartbeat.check)
             checkpoint["render_directory"] = str(render_directory)
+            checkpoint["render_scene_sha256"] = scene_digest(candidate)
             checkpoint["render_report_sha256"] = hashlib.sha256((render_directory / "report.json").read_bytes()).hexdigest()
             save("validating", "validating")
             # Independent contexts review each source page. This is agent review only and cannot certify
@@ -254,7 +265,8 @@ def run_once(store, provider=None):
                 result = infer(f"review-{page_index}", "\nIndependently compare this official page and actual 3D renders with the "
                     "coverage index and candidate. Report omitted panels, wrong parts/colours, floating poses, "
                     "unjustified attachments and ambiguous evidence. Do not accept invisible hidden connections. "
-                    f"Page: {page_index}. Index: {json.dumps(indexes[page_index])}. Candidate: {json.dumps(candidate)}",
+                    f"Page: {page_index}. Index: {json.dumps(indexes[page_index])}. "
+                    f"Page-local candidate changes: {json.dumps(page_review_context(candidate, digest, page_index))}",
                     [pages_dir / f"page-{page_index:03d}.png", *render_images], Review, heartbeat)
                 reviews.append(result.model_dump(mode="json"))
                 save("validating", "validating")

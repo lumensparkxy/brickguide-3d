@@ -55,8 +55,8 @@ class Comparison(StrictModel):
 
 class AssemblyReport(StrictModel):
     scene_sha256: str
-    review_kind: Literal["matched_camera_source_comparison"]
-    actor_type: Literal["agent", "human"]
+    review_kind: Literal["source_render_comparison"]
+    actor_type: Literal["agent"]
     reviewer_id: str = Field(min_length=1)
     status: Literal["pass", "fail"]
     render_report: EvidenceFile
@@ -78,6 +78,8 @@ def import_validation(store, job_id, bundle_dir: Path):
     directory = store.root / "jobs" / job_id
     scene = SceneV2.model_validate_json((directory / "scene.json").read_text())
     bundle = ValidationBundle.model_validate_json((bundle_dir / "validation-bundle.json").read_text())
+    if scene.set_number != job["set_number"] or scene.guide_id != job["guide_id"]:
+        raise ValueError("Candidate identity does not match the queued job")
     raw_hash = digest(scene)
     if bundle.candidate_sha256 != raw_hash or any(report.scene_sha256 != raw_hash for report in
                                                 (bundle.connector_report, bundle.assembly_report)):
@@ -85,6 +87,8 @@ def import_validation(store, job_id, bundle_dir: Path):
     connector, assembly = bundle.connector_report, bundle.assembly_report
     if connector.status != "pass" or set(connector.supported_instance_ids) != {i.instance_id for i in scene.instances}:
         raise ValueError("Connector validation failed or leaves unsupported physical instances")
+    from .checkers import run_registered_checks
+    actual_checks = run_registered_checks(scene, directory / "geometry", connector.checker_id, connector.checker_version)
     for evidence in connector.evidence:
         evidence.verify(bundle_dir)
     if assembly.status != "pass" or any(c.decision != "pass" for c in assembly.comparisons):
@@ -92,6 +96,10 @@ def import_validation(store, job_id, bundle_dir: Path):
     comparisons = {comparison.step_id: comparison for comparison in assembly.comparisons}
     if len(comparisons) != len(assembly.comparisons) or set(comparisons) != {s.step_id for s in scene.steps}:
         raise ValueError("Rendered assembly comparison must cover every microstep exactly once")
+    trusted = job["checkpoint"]
+    if (trusted.get("render_scene_sha256") != raw_hash or
+            trusted.get("render_report_sha256") != assembly.render_report.sha256):
+        raise ValueError("Assembly report is not bound to this engine job's actual browser render receipt")
     render_file = assembly.render_report.verify(bundle_dir)
     rendered = json.loads(render_file.read_text())
     if rendered.get("status") != "rendered" or rendered.get("scene_sha256") != raw_hash:
@@ -117,7 +125,8 @@ def import_validation(store, job_id, bundle_dir: Path):
     geometry = verify_assets(directory / "geometry", [i.geometry_ref for i in scene.instances])
     if geometry["status"] != "pass":
         raise ValueError("Geometry provenance failed")
-    validated = scene.model_copy(update={"geometry_check": "pass", "connector_check": "pass"})
+    validated = scene.model_copy(update={"geometry_check": actual_checks["geometry_check"],
+                                         "connector_check": actual_checks["connector_check"]})
     validation = ReleaseValidation(scene_sha256=digest(validated), coverage_index_sha256=digest(bundle.source_index),
         expected_step_keys=bundle.source_index.get("expected_step_keys", []), covered_step_keys=coverage_keys(validated),
         source_evidence_verified=True, geometry_provenance_verified=True, assembly_review="pass", blockers=[],

@@ -188,6 +188,11 @@ def deploy(preview_only=False):
                    '--service-account=projects/' + CFG['project'] + '/serviceAccounts/' + service_account('builder'),
                    '--gcs-source-staging-dir=gs://' + CFG['build_bucket'] + '/source')
     save('build-' + revision[:12] + '.json', build)
+    built_images = build.get('results', {}).get('images', [])
+    built_image = next((item for item in built_images if item.get('name') == image), None)
+    if not built_image or not built_image.get('digest', '').startswith('sha256:'):
+        raise RuntimeError('Build did not return the expected immutable image digest')
+    image = image.rsplit(':', 1)[0] + '@' + built_image['digest']
     env = ','.join(['GUIDE2BUILD_PUBLIC_STORE=firestore', 'GOOGLE_CLOUD_PROJECT=' + CFG['project'],
                     'GUIDE2BUILD_FIRESTORE_DATABASE=' + CFG['database'],
                     'GUIDE2BUILD_REQUEST_DATABASE=' + CFG['request_database'],

@@ -4,7 +4,8 @@ import json
 import os
 import re
 import time
-from collections import deque
+from collections import deque, OrderedDict
+from threading import RLock
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -35,23 +36,39 @@ def create_app(store=None, catalogue_path: Path | None = None, web_dist: Path | 
     catalogue = json.loads((catalogue_path or ROOT / 'config/sets.json').read_text())['sets']
     app.state.store = store
     admission = deque()
-    release_cache = {}
-    known_guides = {(item['set_number'], g['guide_id']) for item in catalogue for g in item['guides']}
+    release_cache = OrderedDict()
+    catalogue_cache = [0.0, []]
+    cache_lock = RLock()
 
-    def read_release(set_number, guide_id, full=False):
-        if (set_number, guide_id) not in known_guides:
-            return None
-        method = store.head if full else store.head_info
+    def published_catalogue():
         if not isinstance(store, FirestoreReleaseStore):
-            return method(set_number, guide_id)
-        key = (set_number, guide_id, full)
-        cached = release_cache.get(key)
-        now = time.monotonic()
-        if cached is not None and now < cached[0]:
-            return cached[1]
-        value = method(set_number, guide_id)
-        release_cache[key] = (now + 30, value)
-        return value
+            return store.published_catalogue()
+        with cache_lock:
+            now = time.monotonic()
+            if now >= catalogue_cache[0]:
+                catalogue_cache[:] = [now + 30, store.published_catalogue()]
+            return catalogue_cache[1]
+
+    def read_release(set_number, guide_id):
+        entry = next((e for e in published_catalogue()
+                      if e['set_number'] == set_number and e['guide_id'] == guide_id), None)
+        if entry is None:
+            return None  # random searches never create per-set database reads or cache entries
+        if not isinstance(store, FirestoreReleaseStore):
+            return store.head(set_number, guide_id)
+        with cache_lock:
+            key = (set_number, guide_id, entry['release_sha256'])
+            cached = release_cache.get(key)
+            now = time.monotonic()
+            if cached is not None and now < cached[0]:
+                release_cache.move_to_end(key)
+                return cached[1]
+            value = store.head(set_number, guide_id)
+            release_cache[key] = (now + 30, value)
+            release_cache.move_to_end(key)
+            while len(release_cache) > 4:
+                release_cache.popitem(last=False)
+            return value
 
     asset_base = os.getenv('GUIDE2BUILD_ASSET_BASE_URL', '/published-assets/').rstrip('/') + '/'
 
@@ -89,22 +106,35 @@ def create_app(store=None, catalogue_path: Path | None = None, web_dist: Path | 
         if not re.fullmatch(r'[0-9]{4,7}', set_number):
             error(422, 'invalid_set_number', 'Enter a 4–7 digit set number.')
         item = next((x for x in catalogue if x['set_number'] == set_number), None)
-        if not item:
+        published = {entry['guide_id']:entry for entry in published_catalogue() if entry['set_number'] == set_number}
+        if not item and not published:
             return {'set_number': set_number, 'name': None, 'official_page': None, 'guides': [], 'status': 'not_ready'}
+        configured = {g['guide_id']:g for g in item['guides']} if item else {}
         guides = []
-        for guide in item['guides']:
-            release = read_release(set_number, guide['guide_id'])
-            guides.append({k: guide[k] for k in ('guide_id', 'label', 'expected_page_count', 'expected_main_steps', 'pdf_url')})
-            guides[-1].update(tutorial_available=release is not None, status='published' if release else 'not_ready',
-                release_manifest_url=f"/api/v1/sets/{set_number}/guides/{guide['guide_id']}/release" if release else None)
-        return {'set_number': set_number, 'name': item['name'], 'official_page': item['official_page'],
-                'guides': guides, 'status': 'published' if any(g['tutorial_available'] for g in guides) else 'not_ready'}
+        for guide_id in dict.fromkeys([*configured, *published]):
+            entry = published.get(guide_id)
+            guide = configured.get(guide_id)
+            if guide:
+                metadata = {k: guide[k] for k in ('guide_id', 'label', 'expected_page_count', 'expected_main_steps', 'pdf_url')}
+            else:
+                metadata = {'guide_id':guide_id, 'label':f'Booklet {guide_id}',
+                            'expected_page_count':entry['source']['page_count'], 'expected_main_steps':None,
+                            'pdf_url':entry['source']['official_url']}
+            if entry:
+                metadata.update(pdf_url=entry['source']['official_url'],
+                                expected_page_count=entry['source']['page_count'])
+            metadata.update(tutorial_available=entry is not None, status='published' if entry else 'not_ready',
+                release_manifest_url=f"/api/v1/sets/{set_number}/guides/{guide_id}/release" if entry else None)
+            guides.append(metadata)
+        return {'set_number': set_number, 'name': item['name'] if item else f'Set {set_number}',
+                'official_page': item['official_page'] if item else next(iter(published.values()))['source']['official_url'],
+                'guides': guides, 'status': 'published' if published else 'not_ready'}
 
     @app.get('/api/v1/sets/{set_number}/guides/{guide_id}/release')
     def release(set_number: str, guide_id: str):
         if not re.fullmatch(r'[0-9]{4,7}', set_number) or not re.fullmatch(r'[a-z0-9-]{1,80}', guide_id):
             error(422, 'invalid_identity', 'Invalid tutorial identifier.')
-        manifest = read_release(set_number, guide_id, full=True)
+        manifest = read_release(set_number, guide_id)
         if not manifest:
             error(404, 'tutorial_not_published', 'This tutorial isn’t ready yet.')
         base = asset_base + manifest['release_sha256'] + '/'

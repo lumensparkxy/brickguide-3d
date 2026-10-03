@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "stage": "reviewable_local_prototype",
-  "active_milestone": "M7_acceptance_blocked",
+  "stage": "cloud_batch_implementation_reconstruction_blocked",
+  "active_milestone": "cloud_deployment_verification",
   "initial_set": "30669",
   "initial_guide": "alt-02",
   "source_sha256": "6cb3e669fef3662dfd498cba0e631f1d9ec082c2bf8c0fb0a0febe303680a6b6",
   "covered_main_steps": 12,
   "reviewed_main_steps": 0,
   "expected_main_steps": 12,
-  "runtime_vision_provider": "disabled",
+  "runtime_vision_provider": "local_codex_cli_chatgpt",
   "reference_authoring_status": "corrected_candidate_needs_review",
-  "automatic_conversion_status": "blocked_provider_disabled",
+  "automatic_conversion_status": "pilot_partial_blocked",
   "human_review_status": "not_run",
   "physical_build_status": "not_run",
   "github_issue_mapping": {},
-  "next_action": "Resolve source-matched part/pose errors and complete one reconstruction end-to-end; then repeat the ten-set construction matrix. Fresh partials exist for all ten in isolated evidence, but zero new complete or accepted tutorials. Automatic runtime conversion remains disabled.",
+  "next_action": "Verify private/public Cloud Run code deployment. Complete source-faithful pilot and implement independently tested geometry/connector checker before opening the remaining 18-booklet campaign gate.",
   "evidence_report": "docs/execution/VALIDATION_REPORT.md",
   "source_pages": 8,
   "toolchain": {
@@ -319,7 +319,7 @@
     "physical_build": "not_run"
   },
   "cloud_batch_release": {
-    "stage": "implementation_in_progress",
+    "stage": "deployment_checks_in_progress",
     "baseline_commit": "4860bb7",
     "project": "lumensparkxy",
     "region": "europe-west1",
@@ -327,11 +327,19 @@
     "sources_pinned": 19,
     "source_pages": 2231,
     "cloud_resources": "provisioned_databases_buckets_repository_service_accounts",
-    "web_deployment": "not_run",
-    "budget_alerts": "billing_api_permission_denied_investigating_project_console",
+    "web_deployment": "first_build_failed_missing_inputs_fixed_retry_pending",
+    "budget_alerts": "created_CHF8.26_project_scope_50_80_100_percent",
     "tutorials_published": 0,
-    "engine": "real_codex_image_call_verified_pilot_blocked_part_identity_retrying",
+    "engine": "restricted_real_codex_pilot_blocked_step3",
     "public_portal_browser_checks": 13,
-    "manual_tutorial_approval_required": true
+    "manual_tutorial_approval_required": true,
+    "engine_main_steps": 2,
+    "engine_expected_steps": 12,
+    "engine_physical_instances": 5,
+    "booklets_queued": 18,
+    "automatic_tutorials_completed": 0,
+    "deterministic_checker": "not_implemented_fail_closed",
+    "large_assembly_context_limit_bytes": 400000,
+    "report": "docs/execution/CLOUD_RELEASE_REPORT.md"
   }
 }

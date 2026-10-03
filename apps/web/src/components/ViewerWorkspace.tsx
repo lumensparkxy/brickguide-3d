@@ -14,7 +14,7 @@ export default function ViewerWorkspace({ scene: initialScene, guide, onClose, o
   const [colorNames,setColorNames] = useState<Record<string,string>>({});
   const [index,setIndex] = useState(()=>readProgress(scene)); const [replay,setReplay] = useState(0);
   useEffect(()=>{if(!releaseLoader){setLoadedScene(initialScene);return;}let stopped=false;setChunkError('');releaseLoader.window(index).then(value=>{if(!stopped){setLoadedScene(value);}}).catch(e=>{if(!stopped)setChunkError(e instanceof Error?e.message:'Instruction unavailable.');});return()=>{stopped=true;};},[initialScene,releaseLoader,index,chunkRetry]);
-  const snapshotReady=!releaseLoader||Object.keys(scene.steps[index].poses).length===scene.steps[index].visible_instance_ids.length;
+  const snapshotReady=!releaseLoader||scene.steps[index].snapshot_loaded===true;
   const [playback,setPlayback] = useState<'idle'|'playing'|'paused'>('idle');
   const [animationDone,setAnimationDone] = useState(false); const [ready,setReady] = useState(false);
   const [buildFinished,setBuildFinished] = useState(false);

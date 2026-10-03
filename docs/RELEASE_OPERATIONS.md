@@ -17,7 +17,7 @@ A release requires:
 - A structurally valid source-aware v2 scene with geometry and connector checks passing.
 - A validation report bound to the canonical scene SHA-256, no blocking findings, an assembly review, and complete source coverage.
 - A separate, independently verified coverage index. Raw model-generated `automatic_unverified` indexing is not sufficient.
-- Sources matching `config/release-sources.json`: set/booklet identity, actual PDF hash, official URL and page count. Update pins only from verified official bytes; never from model output.
+- Sources matching `config/release-sources.json`: set/booklet identity, actual PDF hash, official URL and page count. Append new edition pins only from verified official bytes; never from model output. Retain old hash-specific pins so approved earlier versions remain verifiable and rollback stays available. Never overwrite an earlier edition pin merely because a booklet URL now serves new bytes.
 - A PNG captured from the actual model renderer for this exact scene. Do not use a generic image or a PDF screenshot. PNG metadata and size are bounded; its file hash and scene binding enter the immutable manifest.
 - Real individual LDraw geometry with confined paths, actual byte hashes, dependency closure, classifications and retained licence notices.
 
@@ -63,7 +63,7 @@ For an existing tutorial, provide its current release hash:
   --release <new-release-sha256> --expected-head <current-release-sha256>
 ```
 
-Publication revalidates the staged scene and source evidence, copies generation-checked immutable assets to the public bucket, then atomically changes the catalogue head. Interrupted copying leaves the previous tutorial selected. A changed head rejects the update. Approval for one hash cannot approve a correction with another hash.
+Publication revalidates the staged scene and source evidence, copies generation-checked immutable assets to the public bucket, then atomically changes the catalogue head and published catalogue metadata. The published catalogue is a single bounded Firestore document (SQLite has an equivalent transactional table), containing only approved head identities and official source links. Interrupted copying leaves the previous tutorial selected. A changed head rejects the update. Approval for one hash cannot approve a correction with another hash.
 
 Rollback restores a previously approved version; it does not delete history or bytes:
 
@@ -88,10 +88,17 @@ GUIDE2BUILD_WEB_DIST=/app/apps/web/dist
 
 Without the Firestore selector, the public app uses a local SQLite publication store at `var/publication.sqlite3` (override with `GUIDE2BUILD_PUBLIC_DB`). This adapter is for tests and local development; local candidate files never imply publication.
 
-Public requests deduplicate by set number, admit at most 100 new set numbers per UTC day transactionally, and at most 60 request attempts per minute per process before database access. Known-set availability and release reads cache for 30 seconds with a keyspace bounded by the curated catalogue. These limits reduce work; they are not a guaranteed billing cap.
+Public requests deduplicate by set number, admit at most 100 new set numbers per UTC day transactionally, and at most 60 request attempts per minute per process before database access. The published catalogue caches for 30 seconds globally; unknown set searches do not issue per-set database reads. Full manifest reads use a four-entry cache with a 30-second lifetime. Publication is capped at 1,000 booklet entries and 500 KB of catalogue metadata; exceeding either bound rejects the transaction before changing a head. These limits reduce work; they are not a guaranteed billing cap.
 
 ## Evidence boundaries
 
 Package validation proves typed structure, official-source binding, declared coverage consistency, real dependency hashes and explicit review gates. It does not independently prove that every pose matches the PDF, that a coverage reviewer was correct, or that the model was physically assembled. Keep automatic, corrected, agent-reviewed, human-approved and physically tested outcomes distinct.
 
 No current blocked or partial candidate may bypass these gates. Test fixtures and mock PNGs used by the software tests are not production tutorial evidence. Cloud IAM, transfers and deployment require live verification separately from passing local tests.
+
+
+## Add a new set without a website rebuild
+
+Prepare the new official source locally, append its verified source pin, reconstruct and validate its booklet, then use the same stage/approve/publish commands. Promotion inserts its metadata into the approved catalogue atomically with its release head. The already running portal discovers the set after its catalogue cache refreshes; neither `config/sets.json` in the container nor the container image needs changing for availability.
+
+A newly published set without a curated display name appears as `Set NUMBER`, and its booklet uses its actual guide ID. Its instruction link and page count come from the approved manifest's source record. The portal never invents a title or an official URL. Existing curated names remain useful display metadata; they are not proof of publication. Rollback restores the prior version's source metadata and head in the same transaction.
