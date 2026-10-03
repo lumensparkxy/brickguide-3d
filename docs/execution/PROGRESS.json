@@ -1,0 +1,321 @@
+{
+  "schema_version": 1,
+  "stage": "reviewable_local_prototype",
+  "active_milestone": "M7_acceptance_blocked",
+  "initial_set": "30669",
+  "initial_guide": "alt-02",
+  "source_sha256": "6cb3e669fef3662dfd498cba0e631f1d9ec082c2bf8c0fb0a0febe303680a6b6",
+  "covered_main_steps": 12,
+  "reviewed_main_steps": 0,
+  "expected_main_steps": 12,
+  "runtime_vision_provider": "disabled",
+  "reference_authoring_status": "corrected_candidate_needs_review",
+  "automatic_conversion_status": "blocked_provider_disabled",
+  "human_review_status": "not_run",
+  "physical_build_status": "not_run",
+  "github_issue_mapping": {},
+  "next_action": "Resolve source-matched part/pose errors and complete one reconstruction end-to-end; then repeat the ten-set construction matrix. Fresh partials exist for all ten in isolated evidence, but zero new complete or accepted tutorials. Automatic runtime conversion remains disabled.",
+  "evidence_report": "docs/execution/VALIDATION_REPORT.md",
+  "source_pages": 8,
+  "toolchain": {
+    "python": "3.11.14",
+    "node": "22.14.0",
+    "npm": "11.4.1",
+    "uv": "0.9.2"
+  },
+  "baseline_tests_passed": 37,
+  "source_runtime_tests_passed": 20,
+  "microsteps": 16,
+  "physical_instances": 32,
+  "part_designs": 18,
+  "geometry_dependency_files": 134,
+  "material_files": 1,
+  "current_revision": "pdf-assisted-30669-alt02-v3",
+  "geometry_check": "not_run",
+  "connector_check": "not_run",
+  "corrected_physical_instances": 13,
+  "source_specific_findings": 7,
+  "validation": {
+    "python_tests_passed": 108,
+    "frontend_tests_passed": 27,
+    "browser_tests_passed": 28,
+    "phone_refinement_integration_tests_passed": 2,
+    "typecheck": "pass",
+    "build": "pass",
+    "ruff": "pass",
+    "schema": "pass",
+    "safari": "not_run",
+    "review_targeted_browser_tests_passed": 6,
+    "navigation_targeted_browser_tests_passed": 7,
+    "full_build_targeted_browser_tests_passed": 7,
+    "full_build_regression_browser_tests_passed": 3
+  },
+  "live_job": "c11fb46be9054055b2dbd63f34656094",
+  "measured_cached_load_ms": 1619,
+  "measured_frame_cadence_fps": 46.03684810012651,
+  "camera_controls_followup": {
+    "status": "implemented_and_verified",
+    "root_cause": "mutated camera position before calculating rotation/zoom offset",
+    "frontend_tests_passed": 18,
+    "browser_tests_passed": 10,
+    "evidence": [
+      "var/evidence/camera-check.txt",
+      "var/evidence/camera-browser-full.txt",
+      "var/evidence/camera-controls/measurements.json"
+    ],
+    "browser_checks": [
+      "six toolbar actions",
+      "inverse pairs",
+      "24 rotations",
+      "30 zoom clicks per direction and limits",
+      "drag and scroll interaction",
+      "reset cancels drag inertia"
+    ],
+    "existing_tab_action": "refresh to replace old handler"
+  },
+  "review_panel_followup": {
+    "status": "implemented_and_verified",
+    "preserved_review_records": 40,
+    "all_instruction_topics": 9,
+    "default_scope": "current_instruction",
+    "mapping_records": 32,
+    "frontend_tests_passed": 21,
+    "targeted_browser_tests_passed": 6,
+    "evidence": [
+      "var/evidence/review-check.txt",
+      "var/evidence/review-browser.txt",
+      "var/evidence/review-panel/"
+    ]
+  },
+  "navigation_position_followup": {
+    "status": "implemented_and_verified",
+    "reproduction": "instruction 11 to 12 moves navigation down by 56.5625px before repair",
+    "after_repair": "identical Next and Previous rectangles through 11 to 12 to 11",
+    "coverage": "all 16 instructions at widths 1440, 900 and 390; phone panel tabs",
+    "targeted_browser_tests_passed": 7,
+    "frontend_tests_passed": 21,
+    "evidence": "var/evidence/navigation-position/"
+  },
+  "full_build_playback": {
+    "status": "implemented_and_verified",
+    "date": "2026-10-03",
+    "instructions_played": 16,
+    "animation_ms": 1800,
+    "hold_ms": 1000,
+    "complete_run_ms_including_test_pause": 46724,
+    "final_snapshot_pixel_match_after_reset": true,
+    "pause_resume_stop_verified": true,
+    "reduced_motion_verified": true,
+    "phone_verified": true,
+    "playback_and_viewer_browser_tests_passed": 7,
+    "navigation_and_integration_browser_tests_passed": 3,
+    "frontend_tests_passed": 21,
+    "evidence": "var/evidence/full-build/complete-run.json"
+  },
+  "compact_status_followup": {
+    "date": "2026-10-03",
+    "status": "implemented_and_verified",
+    "change": "Large banner removed; compact origin/status label retained beside title; details moved to collapsed provenance",
+    "browser_tests_passed": 6,
+    "typecheck_and_build": "pass",
+    "evidence": "var/evidence/compact-status/"
+  },
+  "placement_animation_followup": {
+    "date": "2026-10-03",
+    "status": "implemented_and_verified",
+    "instruction_9": "red plates approach upward from below",
+    "source_annotation": "config/placement-30669-alt-02-v3.json",
+    "annotation_origin": "agent_authored_presentation",
+    "checked_instructions": 16,
+    "blocked_approach_highlight_instructions": [
+      2,
+      5,
+      8
+    ],
+    "starting_piece_highlight_instructions": [
+      1,
+      3,
+      6
+    ],
+    "frontend_tests_passed": 26,
+    "playback_and_motion_browser_tests_passed": 4,
+    "integration_browser_tests_passed": 2,
+    "physical_path_validation": "not_run",
+    "evidence": "var/evidence/placement/audit.json"
+  },
+  "open_studio_redesign": {
+    "date": "2026-10-03",
+    "status": "implemented_and_verified",
+    "selected_direction": "Option 2 - Open Studio",
+    "coverage": "12 main steps and all 16 instructions retained; desktop, tablet and phone navigation verified",
+    "changes": [
+      "single instruction/source/parts rail",
+      "dominant model stage and contextual camera toolbar",
+      "unified navigation dock",
+      "shared mobile instruction context",
+      "native modal review and keyboard tabs",
+      "cached shadows and redraw only on change"
+    ],
+    "python_tests_passed": 78,
+    "frontend_tests_passed": 26,
+    "browser_tests_passed": 18,
+    "schema_lint_typecheck_build": "pass",
+    "independent_review": "three P2 accessibility findings fixed and rechecked",
+    "assembly_acceptance": "unchanged - needs_review; human and physical checks not run",
+    "evidence": "var/evidence/open-studio/",
+    "design_qa": "design-qa.md"
+  },
+  "brick_playground_landing": {
+    "date": "2026-10-03",
+    "status": "implemented_and_verified",
+    "selected_direction": "Landing option 1 - Brick Playground",
+    "scope": "Landing and set-to-tutorial handoff; tutorial renderer/styles unchanged",
+    "frontend_tests_passed": 26,
+    "relevant_browser_tests_passed": 8,
+    "focused_responsive_rerun_passed": 3,
+    "typecheck_and_build": "pass",
+    "tested_widths": [
+      1199,
+      768,
+      390,
+      320
+    ],
+    "image_payload_bytes": 556990,
+    "assets": "apps/web/public/images/landing/PROVENANCE.md",
+    "source_and_assembly_acceptance": "unchanged",
+    "evidence": "var/evidence/landing-playground/",
+    "design_qa": "design-qa.md"
+  },
+  "yellow_blue_consistency": {
+    "date": "2026-10-03",
+    "status": "implemented_and_verified",
+    "changes": [
+      "shared yellow-blue tutorial, review and preparation palette",
+      "native booklet selection dialog with keyboard and phone support",
+      "visible safe replay feedback and readiness gating",
+      "stable sibling instruction layout and camera framing",
+      "stale request isolation after dismissal"
+    ],
+    "python_tests_passed": 78,
+    "frontend_tests_passed": 26,
+    "unique_browser_tests_passed": 26,
+    "browser_run_detail": "23 of 26 passed broad run; all 7 tests in affected integration/open-studio/viewer files passed after repairing timing, hidden-copy selector and absent-geometry replay expectations",
+    "schema_lint_typecheck_build": "pass",
+    "tested_widths": [
+      1440,
+      900,
+      390,
+      320
+    ],
+    "independent_review": "async-dismiss P2 fixed and rechecked",
+    "assembly_acceptance": "unchanged - needs_review; human and physical checks not run",
+    "evidence": "var/evidence/theme-consistency/",
+    "replay_evidence": "var/evidence/replay-feedback/"
+  },
+  "ten_set_release_audit": {
+    "date": "2026-10-03",
+    "status": "audit_complete_release_gate_blocked",
+    "selected_sets": {
+      "simple": [
+        "30669",
+        "60400",
+        "31134"
+      ],
+      "medium": [
+        "42163",
+        "76920",
+        "31129"
+      ],
+      "complex": [
+        "42171",
+        "21343",
+        "21061",
+        "10316"
+      ]
+    },
+    "sets_reaching_candidate": 1,
+    "unsupported_sets": 9,
+    "accepted_tutorials": 0,
+    "automatic_conversion": "blocked_provider_unavailable",
+    "source_pdfs_downloaded_and_rendered": 4,
+    "source_pages_rendered": 176,
+    "selected_pdfs_rejected_by_size_limit": 6,
+    "python_tests_passed": 78,
+    "frontend_tests_passed": 26,
+    "browser_regressions_passed": 27,
+    "benchmark_cases_skipped_in_normal_suite": 2,
+    "benchmark_profiles_passed_separately": 4,
+    "hardware": "Apple M3 / ANGLE Metal / Chromium153 / production preview",
+    "desktop_orbit_render_fps": 59.86380983227476,
+    "desktop_gpu_mixed_workload_p95_ms": 1.616875,
+    "desktop_cold_http_workflow_ms": 2395.1999999284744,
+    "desktop_warm_http_workflow_ms": 921.7000000476837,
+    "gpu_utilization_and_vram_bytes": "not_measured",
+    "report": "docs/execution/TEN_SET_RELEASE_REPORT.md",
+    "evidence": "var/evidence/ten-set-release/",
+    "assembly_acceptance": "unchanged - needs_review; human/physical checks not_run",
+    "snapshot_scope": "Historical baseline before source-limit/catalogue changes; see bounded_source_preparation for current source support"
+  },
+  "bounded_source_preparation": {
+    "date": "2026-10-03",
+    "status": "implemented_and_verified",
+    "catalogue_sets": 10,
+    "official_booklets": 19,
+    "pdf_pages_rendered": 2231,
+    "live_jobs_completed": 19,
+    "final_page_api_checks_passed": 19,
+    "pipeline_version": "assisted-batched-v3",
+    "resume_format_version": 2,
+    "pdf_max_mib": 256,
+    "pdf_max_pages": 1000,
+    "batch_max_pages": 25,
+    "download_seconds": 300,
+    "render_output_max_mib": 2048,
+    "backend_tests_passed": 108,
+    "frontend_tests_passed": 27,
+    "browser_tests_passed": 28,
+    "final_ui_recheck_passed": 1,
+    "real_cancel_resume": "42171:25pages retained;360completed;firstpageunchanged",
+    "independent_review": "three source-serving/identity/resume findings fixed and independently rechecked",
+    "available_3d_candidates": 1,
+    "missing_set_reconstructions": 9,
+    "automatic_conversion": "blocked_provider_unavailable",
+    "gpu_limits": "unchanged",
+    "report": "docs/execution/LARGE_SOURCE_PREPARATION.md",
+    "evidence": "var/evidence/large-source-pipeline/",
+    "candidate_scope_note": "Counts here describe production catalogue support at that checkpoint. Later fresh partial reconstructions are isolated benchmark evidence, not published tutorials."
+  },
+  "ten_set_construction_benchmark": {
+    "date": "2026-10-03",
+    "status": "attempted_all_ten_full_construction_failed",
+    "sets_attempted": 10,
+    "booklet_candidates": 11,
+    "complete_tutorials": 0,
+    "accepted_assembly_steps": 0,
+    "mode": "pdf_assisted_authoring",
+    "automatic_conversion": "not_run_provider_disabled",
+    "private_evidence_only": true,
+    "browser_tests_passed": 11,
+    "candidate_parts_range": [
+      3,
+      66
+    ],
+    "http_cold_load_ms_range": [
+      929,
+      1618
+    ],
+    "orbit_render_fps_range": [
+      59.83,
+      59.97
+    ],
+    "gpu_mixed_p95_ms_range": [
+      0.904,
+      3.106
+    ],
+    "full_100_page_construction_time": "not_established",
+    "report": "docs/execution/TEN_SET_CONSTRUCTION_BENCHMARK.md",
+    "evidence": "var/evidence/ten-set-construction/",
+    "human_review": "not_run",
+    "physical_build": "not_run"
+  }
+}
