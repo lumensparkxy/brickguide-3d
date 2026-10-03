@@ -330,7 +330,7 @@
     "web_deployment": "verified_public_and_private_preview",
     "budget_alerts": "created_CHF8.26_project_scope_50_80_100_percent",
     "tutorials_published": 0,
-    "engine": "restricted_real_codex_pilot_blocked_step3",
+    "engine": "pilot_blocked_step3_attachment_after_context_repair",
     "public_portal_browser_checks": 13,
     "manual_tutorial_approval_required": true,
     "engine_main_steps": 2,
@@ -355,7 +355,48 @@
     "existing_resources": "krishi_spec_generation_and_default_database_configuration_unchanged",
     "tutorials_awaiting_approval": 0,
     "website_rollback": "actual_second_revision_promote_and_restore_pass",
-    "tutorial_rollback": "not_run_no_eligible_approved_content"
+    "tutorial_rollback": "not_run_no_eligible_approved_content",
+    "resume_processing": {
+      "date": "2026-10-03",
+      "job_id": "e2d62e6aab434b70b202d93a9799a52c",
+      "state": "blocked",
+      "stage": "blocked",
+      "completed_panels": 2,
+      "total_panels": 12,
+      "error": {
+        "code": "construction_blocked",
+        "message": "Unresolved assembly evidence: Panel 3 attachment pose is uncertain: I cannot confidently determine the subassembly\u2019s exact stud offset and vertical placement relative to the existing quarter-circle-cutout plates. An append-only delta would require guessing those transforms."
+      },
+      "worker_running": false,
+      "new_model_calls": 2,
+      "new_active_model_seconds": 157.8307245830074,
+      "cumulative_metrics": {
+        "model_invocations": 18,
+        "model_elapsed_seconds": 939.0839290000731,
+        "reported_usage": {
+          "input_tokens": 417878,
+          "cached_input_tokens": 9856,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 21643,
+          "reasoning_output_tokens": 14064
+        },
+        "usage_reporting": {
+          "status": "complete",
+          "calls_with_usage": 18,
+          "calls_without_usage": 0,
+          "raw_event_calls": 18,
+          "receipt_fallback_calls": 0
+        },
+        "timing_reporting": {
+          "calls_with_elapsed_time": 18,
+          "calls_without_elapsed_time": 0
+        }
+      },
+      "pipeline": "codex-source-context-v3",
+      "repair": "Verified individual subpart definitions and preceding official instruction page",
+      "backend_tests_passed": 161,
+      "published": false
+    }
   },
   "legacy_top_level_scene_metrics_scope": "Existing authored-reference v3 only; automatic campaign is recorded in cloud_batch_release."
 }

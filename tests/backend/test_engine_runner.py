@@ -99,3 +99,23 @@ def test_exact_panel_provenance_rejects_in_range_wrong_page(scene_data):
     with pytest.raises(ValueError, match="exact requested"):
         validate_candidate(scene.model_dump_json(), {"set_number": scene.set_number, "guide_id": scene.guide_id},
                            scene.source_sha256, 10, panel={"number": 1}, page_index=9)
+
+
+def test_resumed_cross_page_panel_receives_target_then_preceding_official_page(source):
+    root, digest = source
+    store = EngineStore(root)
+    job = store.enqueue('30669', 'alt-02', {'model': 'test'})
+    store.claim('seed')
+    def panel(number):
+        return {'section': 'main', 'number': number, 'label': str(number), 'bbox': [0,0,1,1], 'kind': 'main'}
+    indexes = [{'panels': [panel(1)], 'uncertainty': []},
+               {'panels': [panel(n) for n in range(2,13)], 'uncertainty': []}] + [{'panels': [], 'uncertainty': []} for _ in range(6)]
+    store.checkpoint(job['id'], 'seed', {'page_indexes': indexes, 'completed_panels': 1}, 'blocked')
+    store.retry(job['id'])
+    class Inspect:
+        def call(self, prompt, images, *args):
+            assert [p.name for p in images] == ['page-001.png', 'page-000.png']
+            assert 'target page' in prompt and 'page_index must equal the exact' in prompt
+            return {'delta_json': None, 'blockers': ['Test only; no assembly evidence'], 'observations': []}
+    assert run_once(store, Inspect())
+    assert store.get(job['id'])['state'] == 'blocked'

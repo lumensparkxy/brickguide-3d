@@ -67,3 +67,7 @@ This section supersedes historical no-Git/no-provider/no-cloud statements above.
 5. Native-M3 full-assembly GPU/frame-time/cold-warm benchmarks cannot be measured without complete assemblies. Latest automatic partial renders use SwiftShader; no hardware-GPU claim.
 
 Automatic approval review rejected an extra temporary portal impersonation permission. No grant was added or bypassed; IAM policy inspection and service behavior are the alternative checks. Existing approved uploader impersonation was tested and cannot read the release/default databases.
+
+### Requested resume outcome
+
+Two real resumed calls (157.831 active seconds total) retained the pilot at2/12 panels. Verified subpart context and the preceding official page were added; the latest model response specifically blocks on subassembly stud offset and vertical placement against the quarter-circle-cutout plates. A source-grounded attachment solver/review remains necessary. The worker is stopped, not running an idle watcher. The missing complete-scope deterministic checker remains a separate gate. See `var/evidence/engine-resume-result.json`.

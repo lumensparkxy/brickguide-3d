@@ -8,7 +8,7 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-PIPELINE = "codex-source-delta-v2"
+PIPELINE = "codex-source-context-v3"
 TERMINAL = {"blocked", "failed", "cancelled", "awaiting_approval"}
 
 

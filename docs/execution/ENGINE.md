@@ -136,3 +136,9 @@ Actual screenshots for both steps and rendering counters are retained under
 `var/evidence/engine-candidate-render-bafb5402e76e8a18e67a8986c71a1655d866fa6756a0345ba515d28032b2a2a7/`.
 They were visually inspected against the official page, but no connector or completed-assembly pass was granted.
 The browser reported SwiftShader and no GPU timer support; native GPU benchmark status remains `not_run`.
+
+### Context repair during requested resume
+
+`codex-source-context-v3` retains the append-only contract and adds verified Subpart definitions to the individual-part context, within the existing byte budget. This repairs wrapper-only parts such as25269, whose shape is defined in `parts/s/25269s01.dat`. Definitions retain their hashes, depth/count limits and explicit truncation flags. No assembly coordinates or authored reference are loaded.
+
+At a page boundary, construction receives the target official page first and the preceding instruction page second. The preceding page supplies orientation context only; new instance/step source references must still match the exact target page. These additions are evidence input improvements, not geometry/connector certification.

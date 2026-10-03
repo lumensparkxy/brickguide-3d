@@ -208,9 +208,15 @@ def run_once(store, provider=None):
             candidate = checkpoint.get("candidate") or continuation
             for ordinal in range(checkpoint.get("completed_panels", 0), len(panels)):
                 page_index, panel = panels[ordinal]
+                image_pages = [page_index]
+                if ordinal and panels[ordinal - 1][0] != page_index:
+                    image_pages.append(panels[ordinal - 1][0])
                 prompt = (f"\nConstruct the next indexed panel and ALL its substeps, then append them to the prior scene. "
                           f"Set {job['set_number']}, guide {job['guide_id']}, source hash {digest}, "
                           f"official URL {guide['pdf_url']}, page count {len(pages)}, page {page_index}. "
+                          f"Input image order (zero-based official page indexes): {image_pages}. "
+                          "Image 1 is the target page. Any second image is the preceding instruction page "
+                          "for orientation/attachment context only; new source references must use the target page. "
                           "For a continuation preserve physical IDs and prefix new section IDs with the guide ID. "
                           "The engine preserves prior source and section metadata. "
                           f"Panel: {json.dumps(panel)}. Return ONLY an append-only SceneDelta JSON encoded as "
@@ -227,7 +233,7 @@ def run_once(store, provider=None):
                           "manifest poses transform that converted geometry. Never assume all catalogue parts belong "
                           f"to this build: {json.dumps(part_context)}\n"
                           f"Current own assembly state (never historical snapshots or a reference): {json.dumps(current_context(candidate))}")
-                result = infer(f"construct-{ordinal}", prompt, [pages_dir / f"page-{page_index:03d}.png"],
+                result = infer(f"construct-{ordinal}", prompt, [pages_dir / f"page-{index:03d}.png" for index in image_pages],
                                DeltaConstruction, heartbeat, validate=lambda result: validate_candidate(
                                    assemble_delta(result.delta_json, job, digest, len(pages), candidate).model_dump_json(),
                                    job, digest, len(pages), candidate, panel, page_index) if result.delta_json and not result.blockers else None)

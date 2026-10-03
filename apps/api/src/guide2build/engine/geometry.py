@@ -51,9 +51,7 @@ def individual_catalogue_context(shared: Path, max_bytes=100_000):
         return []
     document = json.loads(manifest.read_text())
     result, size = [], 0
-    for relative, record in sorted(document.get("resources", {}).items()):
-        if record.get("classification") != "Part":
-            continue
+    def verified_geometry(relative, record):
         target = shared / relative
         if target.is_symlink() or not target.resolve().is_relative_to(shared.resolve()):
             raise ValueError("Individual part path escapes root")
@@ -64,6 +62,12 @@ def individual_catalogue_context(shared: Path, max_bytes=100_000):
             raise ValueError("Individual part origin not official LDraw")
         if hashlib.sha256(data).hexdigest() != record.get("sha256"):
             raise ValueError("Individual part cache hash mismatch")
+        return data
+
+    for relative, record in sorted(document.get("resources", {}).items()):
+        if record.get("classification") != "Part":
+            continue
+        data = verified_geometry(relative, record)
         # Keep source notices but never use comments as executable instructions.
         geometry = data.decode("utf-8-sig")[:6000]
         size += len(geometry.encode())
@@ -71,6 +75,37 @@ def individual_catalogue_context(shared: Path, max_bytes=100_000):
             break
         result.append({"geometry_ref": relative, "description": record.get("description"),
                        "raw_ldraw_part_geometry": geometry, "truncated": len(data) > 6000})
+    # A Part can be only a tiny reference wrapper around its asymmetric shape. Preserve
+    # those transforms and supply verified Subpart definitions, never assembly models.
+    # Roots retain priority; supplementary bytes share the same existing context budget.
+    for part in result:
+        record = document["resources"][part["geometry_ref"]]
+        pending = [(path, 0) for path in record.get("dependencies", [])]
+        seen, definitions = set(), []
+        part["subparts_truncated"] = False
+        while pending:
+            path, depth = pending.pop(0)
+            if path in seen:
+                continue
+            seen.add(path)
+            dependency = document["resources"].get(path)
+            if dependency is None:
+                raise ValueError("Missing individual geometry dependency receipt")
+            if dependency.get("classification") != "Subpart":
+                continue
+            if depth > 2 or len(definitions) >= 8:
+                part["subparts_truncated"] = True
+                continue
+            data = verified_geometry(path, dependency)
+            text = data.decode("utf-8-sig")[:6000]
+            if size + len(text.encode()) > max_bytes:
+                part["subparts_truncated"] = True
+                continue
+            size += len(text.encode())
+            definitions.append({"geometry_ref": path, "sha256": dependency["sha256"],
+                                "raw_ldraw_subpart_geometry": text, "truncated": len(data) > 6000})
+            pending.extend((child, depth + 1) for child in dependency.get("dependencies", []))
+        part["subpart_definitions"] = definitions
     return result
 
 
