@@ -36,7 +36,8 @@ def gcloud(*args, check=True, quiet=True):
     if check and result.returncode:
         raise RuntimeError(f'gcloud {" ".join(args[:3])} failed: {result.stderr[-3000:]}')
     if result.returncode:
-        if 'NOT_FOUND' in result.stderr or 'not found' in result.stderr.lower():
+        if ('NOT_FOUND' in result.stderr or 'not found' in result.stderr.lower()
+                or '(gcloud.run.services.describe) Cannot find service [' in result.stderr):
             return None
         raise RuntimeError(result.stderr[-3000:])
     return json.loads(result.stdout) if result.stdout.strip() else {}
@@ -176,17 +177,32 @@ def budget():
                         'scope': 'Entire shared project; conservative alerts also include existing workloads. Not a hard cap.'})
 
 
-def deploy(preview_only=False):
+def deploy(preview_only=False, build_id=None):
     account_gate()
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise RuntimeError('Commit tested changes locally before deployment')
     subprocess.run([sys.executable, 'tools/check.py'], cwd=ROOT, check=True)
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     image = f'{CFG["region"]}-docker.pkg.dev/{CFG["project"]}/{CFG["repository"]}/web:{revision}'
-    build = gcloud('builds', 'submit', '.', '--config=deploy/cloudbuild.yaml',
-                   '--substitutions=_IMAGE=' + image,
-                   '--service-account=projects/' + CFG['project'] + '/serviceAccounts/' + service_account('builder'),
-                   '--gcs-source-staging-dir=gs://' + CFG['build_bucket'] + '/source')
+    if build_id:
+        build = gcloud('builds', 'describe', build_id)
+        built_tag = build.get('substitutions', {}).get('_IMAGE', '')
+        prefix = image.rsplit(':', 1)[0] + ':'
+        import re
+        if (build.get('status') != 'SUCCESS' or not built_tag.startswith(prefix)
+                or not re.fullmatch('[a-f0-9]{40}', built_tag[len(prefix):])):
+            raise RuntimeError('Only a successful Guide2Build build from a local commit can resume')
+        built_revision = built_tag[len(prefix):]
+        changes = subprocess.check_output(['git', 'diff', '--name-only', built_revision, revision],
+                                          cwd=ROOT, text=True).splitlines()
+        if any(path != 'tools/cloud.py' and not path.startswith(('docs/', 'tests/backend/')) for path in changes):
+            raise RuntimeError('Application inputs changed since the build; rebuild required')
+        revision, image = built_revision, built_tag
+    else:
+        build = gcloud('builds', 'submit', '.', '--config=deploy/cloudbuild.yaml', '--suppress-logs',
+                       '--substitutions=_IMAGE=' + image,
+                       '--service-account=projects/' + CFG['project'] + '/serviceAccounts/' + service_account('builder'),
+                       '--gcs-source-staging-dir=gs://' + CFG['build_bucket'] + '/source')
     save('build-' + revision[:12] + '.json', build)
     built_images = build.get('results', {}).get('images', [])
     built_image = next((item for item in built_images if item.get('name') == image), None)
@@ -275,6 +291,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('command', choices=('preflight', 'provision', 'budget', 'deploy', 'preview', 'rollback'))
     p.add_argument('--apply', action='store_true', help='Execute approved cloud mutations')
+    p.add_argument('--build-id', help='Resume deploy/preview from a successful existing build with unchanged application inputs')
     args = p.parse_args()
     if args.command != 'preflight' and not args.apply:
         print(json.dumps({'action': args.command, 'settings': CFG, 'dry_run': True}, indent=2))
@@ -290,7 +307,7 @@ def main():
         elif args.command == 'rollback':
             rollback()
         else:
-            deploy(preview_only=args.command == 'preview')
+            deploy(preview_only=args.command == 'preview', build_id=args.build_id)
     except (RuntimeError, subprocess.CalledProcessError, OSError, ValueError) as e:
         print('BLOCKED:', str(e), file=sys.stderr)
         return 1

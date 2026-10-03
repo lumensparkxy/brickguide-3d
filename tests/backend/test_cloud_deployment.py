@@ -49,3 +49,21 @@ def test_container_uses_public_entrypoint_and_excludes_var():
         assert text.startswith('**\n')
         assert '!var' not in text
         assert '!config/**' not in text
+
+
+def test_absent_new_cloud_run_service_is_resumable(monkeypatch):
+    from types import SimpleNamespace
+    result = SimpleNamespace(returncode=1, stdout='',
+        stderr='ERROR: (gcloud.run.services.describe) Cannot find service [guide2build-preview]')
+    monkeypatch.setattr(cloud.subprocess, 'run', lambda *a, **k: result)
+    assert cloud.gcloud('run', 'services', 'describe', 'guide2build-preview', check=False) is None
+    with pytest.raises(RuntimeError):
+        cloud.gcloud('run', 'services', 'describe', 'guide2build-preview')
+
+
+def test_permission_denial_is_not_treated_as_missing_service(monkeypatch):
+    from types import SimpleNamespace
+    result = SimpleNamespace(returncode=1, stdout='', stderr='PERMISSION_DENIED: access denied')
+    monkeypatch.setattr(cloud.subprocess, 'run', lambda *a, **k: result)
+    with pytest.raises(RuntimeError, match='PERMISSION_DENIED'):
+        cloud.gcloud('run', 'services', 'describe', 'guide2build-preview', check=False)
