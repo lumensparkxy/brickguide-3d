@@ -7,11 +7,13 @@ test('ten real sets: record catalogue and tutorial gates without substituting mo
   test.setTimeout(120000);
   const dir=process.env.GUIDE2BUILD_AUDIT_DIR??'var/evidence/ten-set-release';await mkdir(dir,{recursive:true});
   await page.setViewportSize({width:1440,height:900});await page.goto('/');
+  await expect(page.getByRole('combobox',{name:'Your set number'}).locator('option')).toHaveCount(10);
   const outcomes=[];
   for(const entry of matrix){
     const started=performance.now();const response=await page.request.get(`/api/v1/sets/${entry.set_number}`);
     const result=await response.json();const lookupMs=performance.now()-started;
-    await page.getByLabel('Your set number').fill(entry.set_number);
+    if(response.ok())await expect(page.getByRole('combobox',{name:'Your set number'}).locator(`option[value="${entry.set_number}"]`)).toHaveText(`${entry.set_number} - ${result.name}`);
+    await page.getByLabel('Your set number').selectOption(entry.set_number);
     await page.getByRole('button',{name:'Find my set',exact:true}).click();
     const outcome:Record<string,unknown>={...entry,lookup_status:response.status(),lookup_ms:lookupMs,rendering:'blocked',correctness:'not_evaluated'};
     if(response.ok()){

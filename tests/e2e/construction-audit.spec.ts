@@ -26,7 +26,7 @@ for(const entry of cases){
   expect(scene.revision).toBe(entry.revision);
   const cdp=await page.context().newCDPSession(page);await cdp.send('Network.enable');await cdp.send('Network.clearBrowserCache');
   async function open(){
-   await page.goto('/?benchmark=1');await page.getByLabel('Your set number').fill(entry.set_number);
+   await page.goto('/?benchmark=1');await page.getByLabel('Your set number').selectOption(entry.set_number);
    const start=await page.evaluate(()=>performance.now());
    await page.getByRole('button',{name:'Find my set',exact:true}).click();
    await page.locator('.guide-row').filter({has:page.getByText(guide.label,{exact:true})}).getByRole('button',{name:'Open tutorial',exact:true}).click();

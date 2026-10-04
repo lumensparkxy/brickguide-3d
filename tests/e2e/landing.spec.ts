@@ -18,7 +18,7 @@ test('playground is responsive, uses real image assets, and links to the workflo
 
 test('example shortcut resolves the supported guide and opens the real tutorial',async({page})=>{
   await page.setViewportSize({width:390,height:844});await page.goto('/');
-  await page.getByLabel('Your set number').fill('12345');
+  await page.getByLabel('Your set number').selectOption('60400');
   await page.getByRole('button',{name:'Try the plane tutorial',exact:true}).click();
   await expect(page.locator('.workspace')).toBeVisible();
   await expect(page.locator('.candidate-status')).toContainText('needs review');
@@ -37,8 +37,8 @@ test('example shortcut keeps unavailable-source preparation and lookup errors ac
   await expect(page.getByRole('button',{name:'Prepare official booklet',exact:true})).toBeVisible();
   await expect(page.locator('.workspace')).toHaveCount(0);
   await page.getByRole('button',{name:'Close booklet selection'}).click();
-  await page.getByLabel('Your set number').fill('x');
+  await page.route('**/api/v1/sets/30669',r=>r.fulfill({status:503,json:{detail:{code:'source_unavailable',message:'The official source is temporarily unavailable.'}}}));
   await page.getByRole('button',{name:'Find my set',exact:true}).click();
-  await expect(page.getByRole('alert')).toContainText('4–7 digits');
+  await expect(page.getByRole('alert')).toContainText('temporarily unavailable');
   await expect(page.getByRole('heading',{name:'Set lookup',exact:true})).toBeFocused();
 });

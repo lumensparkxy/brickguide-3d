@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { moveCamera } from './camera';
+import { createSourceCamera, inspectSourceCamera, moveCamera, validateSourceCamera } from './camera';
 
 function setup() {
   const camera = new PerspectiveCamera(38, 1.5, .1, 20000);
@@ -53,5 +53,36 @@ describe('camera toolbar', () => {
     const startA = a.camera.position.clone(), startB = b.camera.position.clone();
     moveCamera(a.camera, a.controls, 'pan-right'); moveCamera(b.camera, b.controls, 'pan-right');
     expect(b.camera.position.distanceTo(startB) / a.camera.position.distanceTo(startA)).toBeCloseTo(1.25, 8);
+  });
+});
+
+describe('source orthographic camera', () => {
+  const input = {projection:'orthographic',right:[.8,0,.6],up:[.3,Math.sqrt(.75),-.4],target_ldu:[5,5,10],vertical_span_ldu:180,image_size:[1200,900]};
+  it.each([[1000,700],[390,700],[1200,900]])('preserves full-page landmark positions in a %sx%s canvas', (width,height) => {
+    const before = structuredClone(input), view = createSourceCamera(input,width,height);
+    const point = new Vector3(-20,8,40), delta = point.clone().sub(new Vector3().fromArray(input.target_ldu));
+    const expectedU = .5+delta.dot(new Vector3().fromArray(input.right))/(180*1200/900);
+    const expectedV = .5-delta.dot(new Vector3().fromArray(input.up))/180;
+    const ndc = point.clone().project(view.camera), rect = view.sourceRect;
+    expect(((ndc.x+1)*width/2-rect.x)/rect.width).toBeCloseTo(expectedU,10);
+    expect(((1-ndc.y)*height/2-rect.y)/rect.height).toBeCloseTo(expectedV,10);
+    expect(rect.width/rect.height).toBeCloseTo(1200/900,10);
+    expect(input).toEqual(before);
+    expect(inspectSourceCamera(view).projection_matrix).toEqual(view.camera.projectionMatrix.toArray());
+  });
+  it('records actual matrices and does not confuse camera movement with world placement', () => {
+    const view = createSourceCamera(input,1200,900), before = inspectSourceCamera(view);
+    view.camera.position.x += 10;
+    const after = inspectSourceCamera(view);
+    expect(after.input).toEqual(before.input);
+    expect(after.matrix_world_inverse).not.toEqual(before.matrix_world_inverse);
+    expect(after.position_ldu[0]-before.position_ldu[0]).toBeCloseTo(10,8);
+  });
+  it('rejects unknown fields, nonorthonormal axes, invalid dimensions and nonfinite inputs', () => {
+    for(const patch of [{extra:true},{right:[2,0,0]},{up:[.8,0,.6]},{target_ldu:[NaN,0,0]},{vertical_span_ldu:0},{image_size:[10,900]}]) {
+      expect(()=>validateSourceCamera({...input,...patch})).toThrow();
+    }
+    expect(()=>createSourceCamera(input,0,900)).toThrow();
+    expect(()=>createSourceCamera(input,1200,900,Infinity)).toThrow();
   });
 });

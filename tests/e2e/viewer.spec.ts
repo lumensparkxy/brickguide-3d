@@ -1,3 +1,4 @@
+import {selectSyntheticSet} from './synthetic-selection';
 import {test,expect} from '@playwright/test';
 import fixture from '../fixtures/synthetic.scene.json';
 // Structural fixture tests exercise UI state, never reconstruction accuracy for the target set.
@@ -5,7 +6,7 @@ async function synthetic(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/sets/99999',r=>r.fulfill({json:{set_number:'99999',name:'Original synthetic test fixture',official_page:'https://www.lego.com/',guides:[{guide_id:'synthetic',label:'Synthetic test guide',expected_main_steps:3,tutorial_available:true,pdf_url:'https://www.lego.com/example.pdf'}]}}));
   await page.route('**/api/v1/sets/99999/guides/synthetic/scene',r=>r.fulfill({json:fixture}));
   await page.route('**/api/v1/sources/**',r=>r.fulfill({status:404,json:{detail:{message:'Test source intentionally absent'}}}));
-  await page.goto('/'); await page.getByLabel('Set number').fill('99999');await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/'); await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.locator('.candidate-status')).toBeVisible();
   await page.locator('.provenance summary').click();
   await expect(page.getByText('Coverage: 3 of 3 main steps', {exact:false})).toBeVisible();
@@ -20,7 +21,7 @@ test('snapshot navigation, attachment BOM, unavailable replay and revision-scope
   await page.getByRole('button',{name:'Full parts list',exact:true}).click();await expect(page.locator('.parts-table')).toContainText('×2');
   await page.getByLabel('Jump to instruction').selectOption('0');await expect(page.locator('.viewport')).toHaveAttribute('data-step-id','s1');
   await page.getByLabel('Jump to instruction').selectOption('1');
-  await page.reload();await page.getByLabel('Set number').fill('99999');await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.reload();await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Step 2 of 3',exact:true})).toBeVisible();
 });
 test('narrow layout uses accessible panels and reports absent geometry',async({page})=>{

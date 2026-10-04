@@ -21,6 +21,12 @@ def main():
     enqueue.add_argument("--guide")
     enqueue.add_argument("--model", default="gpt-6-astra")
     enqueue.add_argument("--revision", default="1", help="Explicit new experiment identity; never overwrites old jobs")
+    enqueue.add_argument("--max-panel-attempts", type=int, choices=range(1, 6), default=3,
+                         help="Persisted proposal/repair ceiling per instruction (1–5; retries retain it)")
+    enqueue.add_argument("--quality-profile", choices=("strict", "alpha"), default="strict",
+                         help="Image-fit RMS limit: strict 4 px, alpha 8 px (both retain the 12 px point cap). Alpha samples remain unverified.")
+    step = commands.add_parser("step", help="Process at most one new main instruction for this job, then pause")
+    step.add_argument("job_id")
     for command in ("run", "watch"):
         worker = commands.add_parser(command)
         worker.add_argument("--sync-cloud", action="store_true", help="Sync requests every 300s using uploader identity")
@@ -68,9 +74,23 @@ def main():
             receipt = cached_receipt(store.data_dir, set_number, guide_id, guide["pdf_url"])
             job = store.enqueue(set_number, guide_id, {"model": args.model, "reasoning": "high",
                 "revision": args.revision, "pipeline": PIPELINE, "parts_revision": library,
+                "max_panel_attempts": args.max_panel_attempts,
+                "quality_profile": args.quality_profile,
                 "source_sha256": receipt["sha256"] if receipt else None})
             result.append({key: job[key] for key in ("id", "set_number", "guide_id", "state")})
         print(json.dumps(result, indent=2))
+    elif args.command == "step":
+        job = store.get(args.job_id)
+        print(json.dumps({"job_id": job["id"], "action": "one_main_instruction",
+                          "note": "First invocation indexes the official booklet before constructing instruction 1."}), flush=True)
+        processed = run_once(store, job_id=job["id"], max_panels=1)
+        job = store.get(job["id"])
+        print(json.dumps({"job_id": job["id"], "processed": processed, "state": job["state"],
+            "completed_panels": job["checkpoint"].get("completed_panels", 0),
+            "total_panels": job["checkpoint"].get("total_panels"),
+            "error": job["error"], "provider_pause": store.provider_pause(),
+            "scene": str(store.root / "jobs" / job["id"] / "scene.json") if job["checkpoint"].get("candidate") else None,
+            "note": "Paused candidates require inspection; no review or publication is implied."}, indent=2))
     elif args.command in {"run", "watch"}:
         if args.max_jobs < 0 or not 1 <= args.poll_seconds <= 300:
             parser.error("Use nonnegative --max-jobs and --poll-seconds between 1 and 300")
@@ -104,12 +124,15 @@ def main():
         for job in jobs:
             cp = job["checkpoint"]
             from guide2build.engine.reporting import summarize_calls
+            from guide2build.engine.quality import quality_summary
             metrics = summarize_calls(store.root / "jobs" / job["id"] / "calls")
             result["jobs"].append({key: job[key] for key in ("id", "set_number", "guide_id", "state", "error")}
                 | {"stage": cp.get("stage"), "source_sha256": cp.get("source_sha256"),
                    **metrics, "subscription_cost": "not_reported_by_cli",
                    "indexed_pages": len(cp.get("page_indexes", [])), "page_count": cp.get("page_count"),
                    "completed_panels": cp.get("completed_panels", 0), "total_panels": cp.get("total_panels"),
+                   "current_panel_attempt": cp.get("current_panel_attempt"),
+                   "image_quality": quality_summary(job["config"], cp),
                    "evidence": str(store.root / "jobs" / job["id"]), "human_review": "not_run",
                    "physical_build": "not_run", "published": False})
         print(json.dumps(result, indent=2))

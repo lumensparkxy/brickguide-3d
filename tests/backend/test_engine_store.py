@@ -83,3 +83,31 @@ def test_reset_preserves_rejected_candidate_and_source_index(tmp_path):
     assert "candidate" not in store.get(job["id"])["checkpoint"]
     assert store.get(job["id"])["checkpoint"]["page_indexes"] == [1]
     assert len(list((directory / "rejected").glob("*/scene.json"))) == 1
+
+
+def test_targeted_claim_and_explicit_pause_resume(tmp_path):
+    store = EngineStore(tmp_path)
+    first = enqueue(store)
+    target = enqueue(store, "alt-01")
+    assert store.claim("guided", job_id=target["id"])["id"] == target["id"]
+    assert store.get(first["id"])["state"] == "queued"
+    store.checkpoint(target["id"], "guided", {"completed_panels": 1}, "paused")
+    assert store.get(target["id"])["owner"] is None
+    assert store.claim("batch")["id"] == first["id"]
+    store.checkpoint(first["id"], "batch", {}, "blocked")
+    assert store.claim("batch") is None
+    resumed = store.claim("guided", job_id=target["id"])
+    assert resumed["checkpoint"]["completed_panels"] == 1
+
+
+def test_targeted_claim_never_falls_back_or_bypasses_campaign_gate(tmp_path):
+    store = EngineStore(tmp_path)
+    pilot = enqueue(store)
+    other = enqueue(store, "alt-01")
+    store.gate_campaign()
+    assert store.claim("guided", job_id=other["id"]) is None
+    assert store.claim("guided", job_id="missing") is None
+    assert store.claim("guided", job_id=pilot["id"])["id"] == pilot["id"]
+    store.checkpoint(pilot["id"], "guided", {}, "blocked")
+    assert store.claim("guided", job_id=pilot["id"]) is None
+    assert store.get(other["id"])["state"] == "queued"

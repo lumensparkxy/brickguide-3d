@@ -61,9 +61,10 @@ test('closing a pending tutorial restores lookup and ignores its late response',
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button',{name:'Find my set',exact:true})).toBeEnabled();
   await expect(page.getByRole('button',{name:'Find my set',exact:true})).toBeFocused();
-  await page.getByLabel('Your set number').fill('x');
+  await page.route('**/api/v1/sets/60400',r=>r.fulfill({status:503,json:{detail:{code:'source_unavailable',message:'The official source is temporarily unavailable.'}}}));
+  await page.getByLabel('Your set number').selectOption('60400');
   await page.getByRole('button',{name:'Find my set',exact:true}).click();
   const response=page.waitForResponse('**/api/v1/sets/30669/guides/alt-02/scene');release();await response;
-  await expect(page.getByRole('alert')).toContainText('4–7 digits');
+  await expect(page.getByRole('alert')).toContainText('temporarily unavailable');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });

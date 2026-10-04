@@ -15,9 +15,11 @@ jobs:
           python-version: '3.12'
       - name: Install project dependencies
         run: |
-          python -m pip install -e '.[dev]'
+          python -m venv .venv
+          .venv/bin/python -m pip install -e '.[dev]'
           if test -f package-lock.json; then npm ci; else npm install; fi
-      - run: python tools/check.py
+      - run: .venv/bin/python tools/check.py
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --project=software
       # CI never downloads manuals/parts or calls paid models implicitly.
+      # Default local npm run test:e2e also runs the real-source reference project.

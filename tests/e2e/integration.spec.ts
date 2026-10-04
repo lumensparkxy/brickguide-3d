@@ -5,16 +5,18 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const evidence='var/evidence/browser';
 test('real backend lookup, malformed input, unsupported set and provider boundary',async({page})=>{
   await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:900});await page.goto('/');await page.screenshot({path:`${evidence}/lookup-desktop.png`,fullPage:true});
-  await page.getByLabel('Set number').fill('x');await page.getByRole('button',{name:'Find my set'}).click();await expect(page.getByRole('alert')).toContainText('4–7 digits');
-  await page.getByLabel('Set number').fill('12345');await page.getByRole('button',{name:'Find my set'}).click();await expect(page.getByRole('alert')).toContainText(/supported|catalogue/i);
-  await page.getByLabel('Set number').fill('30669');await page.getByRole('button',{name:'Find my set'}).click();await expect(page.getByRole('heading',{name:'30669 · Iconic Red Plane'})).toBeVisible();
+  const invalid=await page.request.get('/api/v1/sets/x');expect(invalid.status()).toBe(422);expect((await invalid.json()).detail.code).toBe('invalid_set_number');
+  const unsupported=await page.request.get('/api/v1/sets/12345');expect(unsupported.status()).toBe(404);expect((await unsupported.json()).detail.code).toBe('unsupported_set');
+  const field=page.getByRole('combobox',{name:'Your set number'});
+  await expect(field.locator('option[value="x"],option[value="12345"]')).toHaveCount(0);
+  await field.selectOption('30669');await page.getByRole('button',{name:'Find my set'}).click();await expect(page.getByRole('heading',{name:'30669 · Iconic Red Plane'})).toBeVisible();
   await expect(page.locator('input[type=file]')).toHaveCount(0);await page.screenshot({path:`${evidence}/source-found-desktop.png`,fullPage:true});
   const unavailable=await page.request.post('/api/v1/conversions',{headers:{'Idempotency-Key':`e2e-auto-${Date.now()}`},data:{set_number:'30669',guide_id:'alt-02',mode:'automated'}});expect(unavailable.status()).toBe(503);expect((await unavailable.json()).detail.code).toBe('provider_unavailable');
 });
 test('real source candidate workspace, navigation, camera, callouts and review',async({page})=>{
   test.setTimeout(90000); // Captures all 16 real steps, camera reversals and viewer reopen cycles.
   const status=await page.request.get('/api/v1/sets/30669/guides/alt-02/status');const info=await status.json();
-  test.skip(!info.latest_candidate_revision,'No PDF-assisted reference revision yet; must be rerun when reconstruction is present.');
+  expect(info.latest_candidate_revision,'The reference project requires the recorded PDF-assisted scene and source/part cache.').toBeTruthy();
   await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:900});await page.goto('/');
   const runtimeErrors:string[]=[];page.on('pageerror',e=>runtimeErrors.push(e.message));
   await page.getByRole('button',{name:'Find my set'}).click();const loadStart=Date.now();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();

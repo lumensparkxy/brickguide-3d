@@ -9,6 +9,9 @@ import tempfile
 import time
 
 
+DEFAULT_INFERENCE_TIMEOUT_SECONDS = 15 * 60
+
+
 class ProviderFailure(RuntimeError):
     def __init__(self, code, message):
         self.code = code
@@ -23,8 +26,12 @@ def child_environment(environ=None):
 
 
 class CodexProvider:
-    def __init__(self, model="gpt-6-astra", timeout=300, executable=None):
+    def __init__(self, model="gpt-6-astra", timeout=DEFAULT_INFERENCE_TIMEOUT_SECONDS,
+                 executable=None, reasoning="high"):
+        if reasoning not in {"low", "medium", "high", "xhigh"}:
+            raise ValueError("Unsupported provider reasoning effort")
         self.model = model
+        self.reasoning = reasoning
         self.timeout = timeout
         self.executable = executable or shutil.which("codex")
         if not self.executable:
@@ -43,7 +50,7 @@ class CodexProvider:
             args = [self.executable, "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
                     "--sandbox", "read-only", "--cd", str(work), "--model", self.model,
                     "--json", "--color", "never", "--output-schema", str(schema_file),
-                    "--output-last-message", str(result_file), "-c", 'model_reasoning_effort="high"',
+                    "--output-last-message", str(result_file), "-c", f'model_reasoning_effort="{self.reasoning}"',
                     "-c", 'approval_policy="never"', "-c", 'web_search="disabled"',
                     "-c", 'forced_login_method="chatgpt"']
             for feature in ("shell_tool", "unified_exec", "apps", "plugins", "hooks", "multi_agent",
@@ -59,6 +66,10 @@ class CodexProvider:
             (evidence / "schema.json").write_text(json.dumps(schema))
             started = time.monotonic()
             with (evidence / "events.jsonl").open("w") as events, (evidence / "stderr.txt").open("w") as errors:
+                (evidence / "request-runtime.json").write_text(json.dumps({"model": self.model,
+                    "reasoning": self.reasoning, "timeout_seconds": self.timeout,
+                    "auth": "chatgpt", "sandbox": "read-only", "tools_disabled": True,
+                    "paid_api_fallback": False}, indent=2))
                 process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=events, stderr=errors,
                                            cwd=work, env=child_environment(), text=True, start_new_session=True)
                 try:
@@ -81,6 +92,13 @@ class CodexProvider:
                         except subprocess.TimeoutExpired:
                             os.killpg(process.pid, signal.SIGKILL)
                             process.wait()
+                    # Keep actual runtime and termination evidence even when a
+                    # timeout or interruption raises before structured output.
+                    (evidence / "process-result.json").write_text(json.dumps({"model": self.model,
+                        "reasoning": self.reasoning, "returncode": process.returncode,
+                        "elapsed_seconds": time.monotonic() - started,
+                        "structured_result_present": result_file.is_file(),
+                        "completion_or_accuracy_claim": False}, indent=2))
             elapsed = time.monotonic() - started
             usage = {}
             for line in (evidence / "events.jsonl").read_text().splitlines():
@@ -92,11 +110,16 @@ class CodexProvider:
                                 usage[key] = usage.get(key, 0) + value
                 except (ValueError, TypeError):
                     continue
-            (evidence / "invocation.json").write_text(json.dumps({"reported_usage": usage,"model": self.model, "elapsed_seconds": elapsed,
+            (evidence / "invocation.json").write_text(json.dumps({"reported_usage": usage,"model": self.model,
+                "reasoning": self.reasoning, "elapsed_seconds": elapsed,
                 "returncode": process.returncode, "auth": "chatgpt", "sandbox": "read-only",
                 "tools_disabled": True, "paid_api_fallback": False}, indent=2))
             if process.returncode != 0 or not result_file.is_file():
                 diagnostic = ((evidence / "stderr.txt").read_text() + (evidence / "events.jsonl").read_text()).lower()
+                if "invalid_json_schema" in diagnostic or "invalid schema for response_format" in diagnostic:
+                    raise ProviderFailure("invalid_schema", "The engine's structured-output schema was rejected by the provider")
+                if "model is not supported when using codex with a chatgpt account" in diagnostic:
+                    raise ProviderFailure("unsupported_model", "The selected model is unavailable through this ChatGPT-authenticated Codex CLI")
                 if any(term in diagnostic for term in ("usage limit", "quota", "rate limit", "429", "credits")):
                     code = "subscription_limit"
                 elif any(term in diagnostic for term in ("unauthorized", "authentication", "login", "401", "token expired")):

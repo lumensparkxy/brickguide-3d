@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawConditionalLineMaterial.js';
 import { approachFor, checkedApproach, type PlacementPlan } from '../placement';
-import { moveCamera, stopCameraMotion, type CameraAction } from '../camera';
+import { createSourceCamera, inspectSourceCamera, moveCamera, stopCameraMotion, type CameraAction } from '../camera';
 import type { SceneManifest, StepSnapshot } from '../contracts';
 // Explicit developer opt-in. No frame sampling or GPU queries run in the normal product path.
 interface RenderSample {
@@ -96,6 +96,9 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     renderer.domElement.setAttribute('aria-label', 'Assembly: drag to rotate, scroll to zoom, right-drag to pan');
     const world = new THREE.Scene(); world.background = new THREE.Color('#edf2f7');
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 20000);
+    let sourceView: ReturnType<typeof createSourceCamera> | null = null;
+    let sourceViewStepId: string | null = null;
+    const clearSourceView = () => { sourceView = null; sourceViewStepId = null; dirty = true; delete element.dataset.sourceCameraFrame; };
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
     const invalidate = () => { dirty = true; };
     controls.addEventListener('change',invalidate);
@@ -107,6 +110,22 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     const fill = new THREE.DirectionalLight(0xe4ecff,.7); fill.position.set(400,250,450); world.add(fill);
     const assembly = new THREE.Group(); world.add(assembly);
     const groups = new Map<string, THREE.Group>(); const outlines = new Map<string, THREE.BoxHelper>();
+    // Deliberate benchmark opt-in only. This control changes the render camera,
+    // never assembly poses, persisted progress, or normal tutorial defaults.
+    const diagnosticScope = window as typeof window & {__guide2buildSourceCamera?:{apply:(value:unknown,stepId:string)=>unknown;clear:()=>void}};
+    const sourceCameraControl = {
+      apply(value: unknown, stepId: string) {
+        if (cancelled || stepId !== stepRef.current.step_id || tween || groups.size !== manifest.instances.length) throw new Error('Source camera requires the loaded immutable snapshot');
+        const box = new THREE.Box3(); for (const group of groups.values()) if(group.visible) box.expandByObject(group);
+        const {width,height} = renderer.domElement.getBoundingClientRect();
+        const candidate = createSourceCamera(value,width,height);
+        const target = new THREE.Vector3().fromArray(candidate.spec.target_ldu);
+        const depth = box.isEmpty() ? 100 : box.getCenter(new THREE.Vector3()).distanceTo(target)+box.getSize(new THREE.Vector3()).length();
+        sourceView = createSourceCamera(candidate.spec,width,height,Math.max(100,depth)); sourceViewStepId = stepId; dirty = true;
+        return inspectSourceCamera(sourceView);
+      }, clear:clearSourceView,
+    };
+    if (benchmark) diagnosticScope.__guide2buildSourceCamera = sourceCameraControl;
     const emphasis = new Map<string, THREE.Group>();
     const mainStepFrames = new Map<string,{bounds:THREE.Box3; parts:THREE.Box3[]}>();
     const cache = new Map<string, Promise<THREE.Group>>(); const geometries = new Set<THREE.BufferGeometry>(); const materials = new Set<THREE.Material>();
@@ -140,6 +159,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     manager.onError = url => { failures.add(url); };
     const loader = new LDrawLoader(manager); loader.setConditionalLineMaterial(LDrawConditionalLineMaterial); loader.setPartsLibraryPath(geometryBase);
     applyStep.current = (animate = false) => {
+      if (sourceViewStepId !== stepRef.current.step_id) clearSourceView();
       mainStepFrames.clear();
       for(const snapshot of manifestRef.current.steps) {
         if(frameKey(snapshot)!==frameKey(stepRef.current))continue;
@@ -148,6 +168,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
         const key=frameKey(snapshot);const frame=mainStepFrames.get(key)??{bounds:new THREE.Box3(),parts:[]};frame.bounds.union(bounds);frame.parts.push(...parts);mainStepFrames.set(key,frame);
       }
       tween = null; setPlacementNote(''); const current = stepRef.current; const visible = new Set(current.visible_instance_ids); const active = new Set(current.active_instance_ids);
+      const showActiveOutlines = current.action !== 'inspect' || current.introduced_instance_ids.length > 0;
       const from = new Map<string, THREE.Vector3>();
       for (const [id, group] of groups) {
         group.visible = visible.has(id); const pose = current.poses[id];
@@ -157,7 +178,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
             from.set(id,group.position.clone());
           }
         }
-        const outline = outlines.get(id); if (outline) { outline.visible = group.visible && active.has(id); (outline.material as THREE.Material).opacity=1; (outline.material as THREE.Material).transparent=false; outline.update(); }
+        const outline = outlines.get(id); if (outline) { outline.visible = showActiveOutlines && group.visible && active.has(id); (outline.material as THREE.Material).opacity=1; (outline.material as THREE.Material).transparent=false; outline.update(); }
         const overlay = emphasis.get(id); if (overlay) overlay.visible = false;
       }
       const stageBounds = new THREE.Box3(); for (const group of groups.values()) if (group.visible) stageBounds.expandByObject(group);
@@ -199,10 +220,11 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       updateStage(box);
     };
     cameraCommand.current = action => {
+      clearSourceView();
       if (action === 'reset') fit();
       else moveCamera(camera, controls, action);
     };
-    const resize = new ResizeObserver(() => { const {width,height} = element.getBoundingClientRect(); viewportVisible = width >= 1 && height >= 1; if (!viewportVisible) return; camera.aspect = width/height; camera.updateProjectionMatrix(); renderer.setSize(width,height); fit(); }); resize.observe(element);
+    const resize = new ResizeObserver(() => { const {width,height} = element.getBoundingClientRect(); viewportVisible = width >= 1 && height >= 1; if (!viewportVisible) return; camera.aspect = width/height; camera.updateProjectionMatrix(); renderer.setSize(width,height); fit(); if(sourceView) sourceCameraControl.apply(sourceView.spec,stepRef.current.step_id); }); resize.observe(element);
     let lastFrame=performance.now();
     const draw = () => {
       const now=performance.now();const delta=now-lastFrame;lastFrame=now;
@@ -228,9 +250,15 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       // The change listener also catches toolbar commands that update controls before this tick.
       controls.update();
       if (dirty && viewportVisible && !document.hidden) {
-        if(benchmark)benchmark.render(world,camera,'viewport',stepRef.current.step_id);else renderer.render(world,camera); dirty = false;
+        const drawingCamera = sourceView?.camera ?? camera;
+        const visibleOutlines = sourceView ? [...outlines.values()].filter(outline=>outline.visible) : [];
+        for(const outline of visibleOutlines) outline.visible = false;
+        if(benchmark)benchmark.render(world,drawingCamera,'viewport',stepRef.current.step_id);else renderer.render(world,drawingCamera); dirty = false;
+        for(const outline of visibleOutlines) outline.visible = true;
         // Recorded from the actual camera for regression checks of sibling-step framing.
-        element.dataset.cameraFrame = [...camera.position.toArray(),...controls.target.toArray(),camera.aspect].map(value=>value.toFixed(6)).join(',');
+        element.dataset.cameraFrame = [...drawingCamera.position.toArray(),...(sourceView?.spec.target_ldu ?? controls.target.toArray()),camera.aspect].map(value=>value.toFixed(6)).join(',');
+        element.dataset.cameraMode = sourceView ? 'source_orthographic' : 'perspective';
+        if(sourceView) element.dataset.sourceCameraFrame = JSON.stringify(inspectSourceCamera(sourceView));
       }
       benchmark?.poll();
       const animationState = tween ? (playbackRef.current.paused?'paused':'playing') : 'idle';
@@ -326,7 +354,10 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       if(!buildBounds.isEmpty()){buildBounds.max.y+=60;buildBounds.min.y-=60;}
       applyStep.current?.(); fit(); if (!cancelled) { if(benchmark)benchmark.audit.readyAtMs=performance.now(); setLoading(false); }
     })().catch(e => { if (!cancelled) { assembly.visible = false; floor.visible = false; outlines.forEach(o => o.visible = false); dirty = true; setError(`Required geometry unavailable. ${e instanceof Error ? e.message : 'Asset error'}`); setLoading(false); } });
-    return () => { cancelled = true; cancelAnimationFrame(frame); resize.disconnect(); controls.removeEventListener('change',invalidate); document.removeEventListener('visibilitychange',invalidate); controls.dispose(); renderer.domElement.removeEventListener('webglcontextlost',onLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); light.shadow.dispose(); benchmark?.dispose(); renderer.dispose(); renderer.domElement.remove(); applyStep.current = null; cameraCommand.current = null; };
+    return () => { cancelled = true; if(diagnosticScope.__guide2buildSourceCamera === sourceCameraControl) delete diagnosticScope.__guide2buildSourceCamera; cancelAnimationFrame(frame); resize.disconnect(); controls.removeEventListener('change',invalidate); document.removeEventListener('visibilitychange',invalidate); controls.dispose(); renderer.domElement.removeEventListener('webglcontextlost',onLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); light.shadow.dispose(); benchmark?.dispose(); renderer.dispose();
+      // Disposal frees Three.js resources; release the browser context as well
+      // when closing a tutorial or replacing a chunk's viewport.
+      renderer.forceContextLoss(); renderer.domElement.remove(); applyStep.current = null; cameraCommand.current = null; };
   }, [manifest.revision, geometryBase]);
   return <div className="viewport-wrap"><div className="viewport" ref={host} data-step-id={step.step_id}/>{placementNote && <p className="placement-note" role="status">{placementNote}</p>}{loading && <p role="status" className="viewport-message">Loading individual part geometry…</p>}{error && <p role="alert" className="viewport-message error">{error}</p>}</div>;
 }

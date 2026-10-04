@@ -8,8 +8,8 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-PIPELINE = "codex-source-context-v3"
-TERMINAL = {"blocked", "failed", "cancelled", "awaiting_approval"}
+PIPELINE = "codex-spatial-repair-v7"
+TERMINAL = {"blocked", "failed", "cancelled", "awaiting_approval", "paused"}
 
 
 class LeaseLost(RuntimeError):
@@ -64,6 +64,13 @@ class EngineStore:
 
     def enqueue(self, set_number, guide_id, config):
         from ..catalog import find_guide
+        from .quality import source_view_policy
+        source_view_policy(config.get("quality_profile", "strict"))
+        mode = config.get("generation_mode", "strict")
+        if mode not in {"strict", "alpha_fast"}:
+            raise ValueError("Unknown generation mode")
+        if mode == "alpha_fast" and config.get("quality_profile") != "alpha":
+            raise ValueError("Fast alpha generation requires the explicit alpha profile")
         guide = find_guide(set_number, guide_id)
         identity = {"set": set_number, "guide": guide_id, "url": guide["pdf_url"],
                     "pipeline": PIPELINE, "config": config}
@@ -92,7 +99,7 @@ class EngineStore:
         with self.connect() as con:
             return [self.decode(row) for row in con.execute("SELECT * FROM engine_jobs ORDER BY created")]
 
-    def claim(self, owner, seconds=120):
+    def claim(self, owner, seconds=120, job_id=None):
         with self.connect() as con:
             con.execute("BEGIN IMMEDIATE")
             if con.execute("SELECT 1 FROM engine_control WHERE key='provider_pause'").fetchone():
@@ -100,12 +107,16 @@ class EngineStore:
             now = time.time()
             if con.execute("SELECT 1 FROM engine_jobs WHERE owner IS NOT NULL AND lease_until>?", (now,)).fetchone():
                 return None  # one inference process globally, even across CLI workers
-            rows = con.execute("""SELECT * FROM engine_jobs WHERE state='queued' OR
-                (owner IS NOT NULL AND lease_until<=?) ORDER BY created""", (now,)).fetchall()
+            rows = con.execute("""SELECT * FROM engine_jobs WHERE
+                (state='queued' OR (state='paused' AND id=?) OR
+                (owner IS NOT NULL AND lease_until<=?)) AND (? IS NULL OR id=?)
+                ORDER BY created""", (job_id, now, job_id, job_id)).fetchall()
             gated = con.execute("SELECT 1 FROM engine_control WHERE key='pilot_gate'").fetchone()
             passed = con.execute("""SELECT 1 FROM engine_jobs WHERE set_number='30669' AND guide_id='alt-02'
                 AND state='awaiting_approval'""").fetchone()
             row = next((row for row in rows if not gated or passed or
+                        (json.loads(row["config"]).get("generation_mode") == "alpha_fast" and
+                         json.loads(row["config"]).get("quality_profile") == "alpha") or
                         (row["set_number"] == "30669" and row["guide_id"] == "alt-02")), None)
             if not row:
                 return None
@@ -222,7 +233,7 @@ class EngineStore:
                 if source.exists():
                     source.replace(quarantine / name)
             checkpoint = job["checkpoint"]
-            for key in ("candidate", "completed_panels", "page_reviews", "staged_manifest", "render_directory",
+            for key in ("candidate", "completed_panels", "page_reviews", "panel_reviews", "staged_manifest", "render_directory",
                         "render_scene_sha256", "render_report_sha256"):
                 checkpoint.pop(key, None)
             con.execute("UPDATE engine_jobs SET checkpoint=? WHERE id=?", (json.dumps(checkpoint), job_id))

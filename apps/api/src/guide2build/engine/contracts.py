@@ -41,6 +41,13 @@ def strict_schema(model):
     # Codex strict outputs require every declared property, including nullable ones.
     def visit(node):
         if isinstance(node, dict):
+            # Pydantic tuples use JSON Schema prefixItems; the provider accepts
+            # homogeneous arrays with items instead. Keep exact length bounds.
+            if node.get("type") == "array" and "prefixItems" in node:
+                items = node.pop("prefixItems")
+                if not items or any(item != items[0] for item in items):
+                    raise ValueError("Model-facing tuples must have homogeneous item schemas")
+                node["items"] = items[0]
             if node.get("type") == "object":
                 node["additionalProperties"] = False
                 node["required"] = list(node.get("properties", {}))

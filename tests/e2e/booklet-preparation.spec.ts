@@ -11,9 +11,10 @@ test('source-only booklets retain identity, render page progress, and resume wit
   await page.route('**/api/v1/conversions',r=>{expect(r.request().postDataJSON()).toEqual({set_number:'10316',guide_id:'booklet-02',mode:'assisted'});queued++;return r.fulfill({status:202,json:job()});});
   await page.route('**/api/v1/jobs/booklet-job',r=>r.fulfill({json:job()}));
   await page.setViewportSize({width:390,height:844});
-  await page.goto('/');await page.getByLabel('Your set number').fill('10316');await page.getByRole('button',{name:'Find my set',exact:true}).click();
+  await page.goto('/');await page.getByLabel('Your set number').selectOption('10316');await page.getByRole('button',{name:'Find my set',exact:true}).click();
   await expect(page.getByRole('button',{name:'Open tutorial',exact:true})).toHaveCount(0);
-  await expect(page.getByText('Instruction count has not been verified.',{exact:true})).toHaveCount(3);
+  await expect(page.getByText('Official booklet',{exact:true})).toHaveCount(3);
+  await expect(page.locator('.guide-row').getByText(/Booklet:.*main steps/)).toHaveCount(0);
   await page.locator('.guide-row').filter({hasText:'Official booklet 2 of 3'}).getByRole('button',{name:'Prepare booklet',exact:true}).click();
   await expect(page.getByText('50 of 600 pages rendered',{exact:true})).toBeVisible();
   await expect(page.getByRole('progressbar')).toHaveAttribute('max','600');

@@ -9,7 +9,7 @@ from ..catalog import find_guide
 from ..jobs.source_cache import cached_receipt
 from ..source import download_pdf, render_pages
 from .contracts import PageIndex, Review, strict_schema
-from .delta import DeltaConstruction, SceneDelta, current_context, assemble_delta, page_review_context
+from .delta import SceneDelta, current_context, page_review_context
 from .provider import CodexProvider, ProviderFailure
 from .store import LeaseLost, PIPELINE
 from ..releases.models import digest as scene_digest
@@ -20,14 +20,16 @@ community models, MPD/LDR assemblies or any other assembly evidence. Individual 
 never substitute generic geometry. If identity, colour or pose is uncertain, record a blocker. Coordinates
 are right-handed Y-up LDU, 20 LDU stud pitch. Preserve stable physical instance IDs across subassemblies.
 Never claim human review, physical testing, connector correctness or geometry verification. Return exactly
-the requested JSON. This is a fresh automatic proposal, not PDF-assisted reference replay.
+the requested JSON. Preserve this job's recorded checkpoint and correction lineage; assisted inputs
+must never be represented as an unassisted reconstruction.
 """
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, *, compact=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".partial")
-    temporary.write_text(json.dumps(value, indent=2) + "\n")
+    serialized = json.dumps(value, separators=(",", ":")) if compact else json.dumps(value, indent=2)
+    temporary.write_text(serialized + "\n")
     temporary.replace(path)
 
 
@@ -107,12 +109,18 @@ class Heartbeat:
         self.thread.join()
 
 
-def run_once(store, provider=None):
+def run_once(store, provider=None, *, job_id=None, max_panels=None):
+    if max_panels is not None and (not isinstance(max_panels, int) or max_panels < 1):
+        raise ValueError("Instruction limit must be a positive integer")
     owner = uuid.uuid4().hex
-    job = store.claim(owner)
+    job = store.claim(owner, job_id=job_id)
     if not job:
         return False
+    if job["config"].get("generation_mode") == "alpha_fast":
+        from .alpha_runner import run_alpha_claimed
+        return run_alpha_claimed(store, job, owner, provider, max_chunks=max_panels)
     checkpoint = job["checkpoint"]
+    previous_runner = checkpoint.get("runner_version")
     checkpoint["runner_version"] = PIPELINE
     directory = store.root / "jobs" / job["id"]
     directory.mkdir(parents=True, exist_ok=True)
@@ -138,7 +146,7 @@ def run_once(store, provider=None):
                     validate(parsed)
                 return parsed
             except ProviderFailure as error:
-                if error.code in {"subscription_limit", "authentication_required", "provider_unavailable"}:
+                if error.code in {"subscription_limit", "authentication_required", "provider_unavailable", "invalid_schema", "unsupported_model"}:
                     raise
                 errors.append(str(error))
             except ValueError as error:
@@ -148,6 +156,12 @@ def run_once(store, provider=None):
     try:
         with Heartbeat(store, job["id"], owner) as heartbeat:
             heartbeat.check()
+            from .quality import bind_source_view_policy
+            bind_source_view_policy(job["config"], checkpoint)
+            if checkpoint.get("candidate") and previous_runner != PIPELINE:
+                save("pipeline_revision_blocked", "blocked", {"code": "fresh_spatial_revision_required",
+                    "message": "This candidate predates connection-based placement. Enqueue a fresh revision; prior evidence is retained."})
+                return True
             guide = find_guide(job["set_number"], job["guide_id"])
             continuation = None
             if job["set_number"] == "10316" and job["guide_id"] in {"booklet-02", "booklet-03"}:
@@ -203,11 +217,25 @@ def run_once(store, provider=None):
                 numbers = {panel["number"] for _, panel in panels if panel["number"] is not None}
                 if numbers != set(range(1, guide["expected_main_steps"] + 1)):
                     raise ValueError("Indexed main steps disagree with independently curated step count")
+            # Coverage is known before the first successful placement. Keep it visible
+            # even when instruction 1 is ambiguous or its provider call fails.
+            checkpoint["total_panels"] = len(panels)
+            save("source_indexed")
             from .geometry import individual_catalogue_context
             part_context = individual_catalogue_context(store.data_dir / "public/ldraw")
+            from .connectors import connector_context
+            connector_catalogue = connector_context(store.data_dir / "public/ldraw")
+            metadata_hash = connector_catalogue.get("metadata_sha256")
+            if checkpoint.get("connector_metadata_sha256", metadata_hash) != metadata_hash:
+                raise ValueError("Connector metadata changed since checkpoint; enqueue a new revision")
+            checkpoint["connector_metadata_sha256"] = metadata_hash
+            save("spatial_context_ready")
             candidate = checkpoint.get("candidate") or continuation
+            initial_completed = checkpoint.get("completed_panels", 0)
             for ordinal in range(checkpoint.get("completed_panels", 0), len(panels)):
                 page_index, panel = panels[ordinal]
+                from .alignment_context import accepted_alignment_context
+                alignment = accepted_alignment_context(directory, checkpoint, candidate)
                 image_pages = [page_index]
                 if ordinal and panels[ordinal - 1][0] != page_index:
                     image_pages.append(panels[ordinal - 1][0])
@@ -223,6 +251,13 @@ def run_once(store, provider=None):
                           "delta_json, or null plus blockers if unable. Never return or modify prior snapshots. "
                           "new_steps.poses contains only transforms for new or moved visible pieces; the deterministic "
                           "engine inherits unchanged poses. Explicitly list all visible and active instance IDs. "
+                          "Write each user-facing instruction in plain building language tied to the source view. "
+                          "Keep coordinate axes, LDU values, connector IDs and derivations in observations only. "
+                          "Active IDs mean pieces introduced or moved in THIS snapshot and must be a subset of "
+                          "visible IDs. Hidden parent pieces must not be active during detached subassembly views. "
+                          "Preserve the printed order of asymmetric attachments: establish image-to-assembly "
+                          "orientation from existing distinctive shapes, distinguish near/far wings, and never "
+                          "choose a side merely from the viewer camera or a verbal left/right label. "
                           "Include new section definitions only once, never repeat existing sections. All instance origins must "
                           "be vision_proposal and mappings candidate. The engine owns scene status, revision, source "
                           "registry and validation flags; do not emit those top-level fields. Instance and step source "
@@ -230,27 +265,51 @@ def run_once(store, provider=None):
                           f"SceneDelta schema: {json.dumps(SceneDelta.model_json_schema())}\n"
                           "Permitted individual part catalogue below is geometry evidence only, not assembly evidence. "
                           "LDraw raw part geometry is converted once with C=diag(1,-1,-1) (180 degrees around X); "
-                          "manifest poses transform that converted geometry. Never assume all catalogue parts belong "
+                          "manifest poses transform that converted geometry. stud_mesh_frames are deterministic local mesh-reference origins in converted "
+                          "Y-up coordinates, not certified connections or assembly placements. Use the visible source "
+                          "stud lattice and local geometry to derive relative translations; distinguish a part's file "
+                          "origin from its contact surface. A freely chosen global origin is not an ambiguity in "
+                          "relative placement. Never seat parts by their bounding-box bottom: a curved or inverted "
+                          "piece can have an outer edge lower than its actual underside socket rim. Derive the "
+                          "mounting rim plane from the individual mesh and align that plane with the receiving "
+                          "stud-bearing surface; a stud cap must enter the socket, not stop below its opening. "
+                          "Record the local seating surfaces and relative-offset derivation in observations; "
+                          "these are proposal reasoning, not connector certification. Keep genuinely ambiguous "
+                          "contacts blocked. Never assume all catalogue parts belong "
                           f"to this build: {json.dumps(part_context)}\n"
+                          f"Supported individual connectors and visible landmarks: {json.dumps(connector_catalogue)}\n"
+                          "The following prior source alignment is hash-bound evidence from this job's last "
+                          "accepted snapshot. Use its named world/image correspondences to establish existing "
+                          "piece identities and near/far orientation. Its image_uv values belong ONLY to that "
+                          "recorded source page and figure; locate fresh centers in the target figure, do not "
+                          "copy old pixel coordinates. The target view may rotate and old studs may become hidden; "
+                          "confirm each current correspondence against the target image. This context does not "
+                          "determine new placements or certify assembly correctness. "
+                          f"Prior accepted source alignment: {json.dumps(alignment)}\n"
                           f"Current own assembly state (never historical snapshots or a reference): {json.dumps(current_context(candidate))}")
-                result = infer(f"construct-{ordinal}", prompt, [pages_dir / f"page-{index:03d}.png" for index in image_pages],
-                               DeltaConstruction, heartbeat, validate=lambda result: validate_candidate(
-                                   assemble_delta(result.delta_json, job, digest, len(pages), candidate).model_dump_json(),
-                                   job, digest, len(pages), candidate, panel, page_index) if result.delta_json and not result.blockers else None)
-                if result.blockers or not result.delta_json:
-                    atomic_json(directory / "blockers.json", result.model_dump(mode="json"))
-                    raise ValueError("Unresolved assembly evidence: " + "; ".join(result.blockers))
-                scene = validate_candidate(assemble_delta(result.delta_json, job, digest, len(pages), candidate).model_dump_json(),
-                                           job, digest, len(pages), candidate, panel, page_index)
-                from .geometry import prepare_geometry
-                geometry_report = prepare_geometry(scene, directory / "geometry", store.data_dir / "public/ldraw")
-                atomic_json(directory / "geometry-validation.json", geometry_report)
+                from .instruction import build_instruction
+                built = build_instruction(job=job, previous=candidate, ordinal=ordinal, panel=panel,
+                    page_index=page_index, page_count=len(pages), source_hash=digest, directory=directory,
+                    pages_dir=pages_dir, geometry_root=store.data_dir / "public/ldraw", prompt=prompt,
+                    images=[pages_dir / f"page-{index:03d}.png" for index in image_pages],
+                    checkpoint=checkpoint, save=save, infer=infer, heartbeat=heartbeat,
+                    validate_candidate=validate_candidate, atomic_json=atomic_json)
+                if built is None:
+                    return True
+                scene, review_record = built
+                checkpoint.setdefault("panel_reviews", []).append(review_record)
                 candidate = scene.model_dump(mode="json")
                 checkpoint["candidate"] = candidate
                 checkpoint["completed_panels"] = ordinal + 1
                 checkpoint["total_panels"] = len(panels)
                 atomic_json(directory / "scene.json", candidate)
                 save("constructing")
+                if max_panels is not None and ordinal + 1 - initial_completed >= max_panels:
+                    save("instruction_ready", "paused")
+                    return True
+            if max_panels is not None:
+                save("construction_complete_needs_validation", "paused")
+                return True
             save("rendering_candidate", "validating")
             from .rendering import render_candidate
             render_directory = directory / "renders" / uuid.uuid4().hex
@@ -276,7 +335,9 @@ def run_once(store, provider=None):
                     [pages_dir / f"page-{page_index:03d}.png", *render_images], Review, heartbeat)
                 reviews.append(result.model_dump(mode="json"))
                 save("validating", "validating")
-            report = {"artifact_kind": "automatic_reconstruction", "scene_sha256": scene_digest(candidate),
+            report = {"artifact_kind": job["config"].get("artifact_kind", "automatic_reconstruction"),
+                "reused_evidence": checkpoint.get("reused_evidence"), "scene_sha256": scene_digest(candidate),
+                "source_view_policy": checkpoint["source_view_policy"],
                 "coverage_index_sha256": hashlib.sha256((directory / "coverage-index.json").read_bytes()).hexdigest(), "source_sha256": digest,
                 "covered_panels": checkpoint["completed_panels"], "expected_panels": len(panels),
                 "agent_page_reviews": reviews, "human_review": "not_run", "physical_build": "not_run",
