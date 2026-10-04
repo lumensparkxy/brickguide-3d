@@ -67,18 +67,30 @@ try {
     expect(value.name).toBe(set.name);
     expect(value.guides.map(guide => guide.guide_id)).toEqual(set.guides.map(guide => guide.guide_id));
     catalogueChecks.push({set_number: value.set_number, name: value.name,
-      guides: value.guides.map(guide => ({guide_id: guide.guide_id, tutorial_available: guide.tutorial_available}))});
+      guides: value.guides.map(guide => ({guide_id: guide.guide_id, tutorial_available: guide.tutorial_available,
+        release_kind: guide.release_kind}))});
   }
   await waitForArtwork();
   await page.screenshot({path: `${output}/desktop.png`, fullPage: true});
   await selector.selectOption('30669');
-  const recorded = page.waitForResponse(r => r.url() === `${base}/api/v1/requests` && r.request().method() === 'POST');
+  const planeAlpha = catalogueChecks.find(set => set.set_number === '30669').guides
+    .some(guide => guide.release_kind === 'unverified_alpha');
+  const recorded = !planeAlpha && page.waitForResponse(r => r.url() === `${base}/api/v1/requests` && r.request().method() === 'POST');
   await page.getByRole('button', {name: 'Find my set', exact: true}).click();
-  expect((await recorded).status()).toBe(202);
   const message = 'This build isn’t ready yet. We’ve added it to our building list. Come back later to see what’s new!';
-  await expect(page.getByRole('status').filter({hasText: message})).toBeVisible();
   await expect(page.getByRole('button', {name: 'Open tutorial', exact: true})).toHaveCount(0);
-  await page.screenshot({path: `${output}/recorded-request.png`});
+  if (planeAlpha) {
+    await page.getByRole('button', {name: 'Open alpha model', exact: true}).click();
+    await expect(page.locator('.candidate-status')).toHaveText('Alpha model · unverified');
+    await expect(page.getByRole('button', {name: 'Replay', exact: true})).toBeEnabled({timeout: 120000});
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.screenshot({path: `${output}/plane-alpha.png`});
+    await page.getByRole('button', {name: 'Back to set lookup'}).click();
+  } else {
+    expect((await recorded).status()).toBe(202);
+    await expect(page.getByRole('status').filter({hasText: message})).toBeVisible();
+    await page.screenshot({path: `${output}/recorded-request.png`});
+  }
   const duplicate = await context.request.post(`${base}/api/v1/requests`, {
     data: {set_number: '30669'}, headers: {Origin: base},
   });
@@ -92,7 +104,10 @@ try {
   await page.screenshot({path: `${output}/phone-home.png`, fullPage: true});
   await selector.selectOption('60400');
   await page.getByRole('button', {name: 'Find my set', exact: true}).click();
-  await expect(page.getByRole('status').filter({hasText: message})).toBeVisible();
+  const kartAlpha = catalogueChecks.find(set => set.set_number === '60400').guides
+    .some(guide => guide.release_kind === 'unverified_alpha');
+  if (kartAlpha) await expect(page.getByRole('button', {name: 'Open alpha model', exact: true})).toHaveCount(2);
+  else await expect(page.getByRole('status').filter({hasText: message})).toBeVisible();
   await expect(page.getByRole('heading', {name: '60400 · Go-Karts and Race Drivers', exact: true})).toBeVisible();
   await expect(page.getByRole('link', {name: 'View official instructions'})).toBeVisible();
   const unknown = await context.request.get(`${base}/api/v1/sets/99998`);
@@ -106,7 +121,7 @@ try {
   await writeFile(`${output}/report.json`, JSON.stringify({base, preview, passed: true, timings, catalogueChecks,
     network: {latencyMs: 40, downloadMbps: 5, uploadMbps: 1}, urls, errors, warnings,
     screenshotArtwork: 'all four landing images decoded; fonts ready',
-    tutorialLoadAndGpu: 'not_measured_no_published_complete_tutorial',
+    tutorialLoadAndGpu: planeAlpha ? 'plane_alpha_geometry_loaded; accuracy and GPU timing not certified' : 'not_measured_no_published_complete_tutorial',
     browser: await browser.version()}, null, 2));
   console.log(JSON.stringify({passed: true, base, output, timings: timings.map(({state, portalReadyMs}) => ({state, portalReadyMs}))}));
 } finally {

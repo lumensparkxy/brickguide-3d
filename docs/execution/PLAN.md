@@ -496,3 +496,23 @@ loaded captures. Final page/console errors and warnings are0. Save release recei
 documentation/diagnostic checkpoint; no further application deployment is needed for that checkpoint.
 The13 unverified alpha candidate booklets remain available at the user's4175 local preview. Next work
 is reconstruction accuracy; no new inference, human acceptance or physical verification was performed.
+
+## Publish the retained alpha models — 4 October 2026
+The user clarified that production should include the3D models, not only the website code. Prepare the
+same13 frozen source-assisted alpha candidates for all10 sets with explicit unverified provenance.
+Primary owns integration, release CLI/source pins/contracts, actual bundle/render/staging evidence,
+GitHub/deployment and the ledger. Backend worker owns release/API categories and backend regressions;
+web worker owns public alpha disclosures/viewer transport and its targeted frontend/browser cases;
+independent reviewer owns read-only asset/provenance/release auditing. Preserve all model poses/jobs.
+
+Add a distinct `unverified_alpha` immutable release category. Preserve strict reviewed-tutorial gates,
+exact-version authenticated publication approval, byte/hash verification and compare-and-swap heads.
+Package only canonical scene chunks, model-render previews and licensed individual geometry/notices.
+Official PDFs/crops, private prompts/evidence, credentials and reconstruction/review routes remain private.
+Verify current official-source pins against retained bytes and prepare actual renderer previews. Test
+tampering, stale manifests, alpha-label downgrade, official links, large scene transport, navigation,
+desktop/mobile, WebGL/part failures and rollback eligibility. Prepare a concrete13-bundle release index
+and complete code/bundle/browser/staging checks before any required exact-hash approval request.
+After authorization for those immutable hashes, publish assets/heads and verify the real production
+plane plus all13 booklet openings and representative large/mobile flows. Record any real blocker;
+never mark publication permission as human assembly acceptance or alpha as automatic accuracy success.

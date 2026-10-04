@@ -16,6 +16,7 @@ describe('published release transport',()=>{
   it('fails closed on invalid mode and untrusted geometry origins',()=>{
     vi.stubGlobal('location',{origin:'http://localhost:5173'});
     expect(()=>parseConfig({mode:'anything',source_images:true,requests_enabled:true})).toThrow();
+    expect(()=>parseConfig({mode:'public',source_images:true,requests_enabled:true})).toThrow();
     for(const url of ['https://evil.test/','//evil.test/','/../escape/','https://storage.googleapis.com/bucket/?secret=1'])expect(()=>assetBase(url)).toThrow();
   });
   it('allows unknown catalogue requests only in public mode',()=>{const unknown={set_number:'99999',name:null,official_page:null,guides:[]};expect(parseSet(unknown,true).guides).toEqual([]);expect(()=>parseSet(unknown)).toThrow();});
@@ -72,5 +73,43 @@ describe('published release transport',()=>{
     await expect(new ReleaseLoader(manifest).window(0)).rejects.toThrow('checksum');
     const duplicate=structuredClone(manifest);duplicate.instances[1].instance_id=duplicate.instances[0].instance_id;expect(()=>parseRelease(duplicate)).toThrow('part');
     const foreign=structuredClone(manifest);foreign.step_index[0].source.source_sha256='b'.repeat(64);expect(()=>parseRelease(foreign)).toThrow('source');
+  });
+  it('retains frozen unverified alpha disclosure without mutating transport input or claiming review',async()=>{
+    vi.stubGlobal('location',{origin:'http://localhost:5173'});
+    const {manifest,payloads}=await releaseFixture();
+    const alpha={artifact_kind:'pdf_assisted_alpha_completion',generation_mode:'alpha_fast',source_coverage:'all_pages_processed_approximate_unverified',
+      coverage_text:'Reported coverage (unverified): 4 source pages processed; 3 candidate instructions.',uncertainty_notes:['Synthetic transport only; geometry is intentionally absent.'],
+      accuracy:'unverified',human_review:'not_run',physical_build:'not_run'};
+    const input={...manifest,status:'needs_review',release_kind:'unverified_alpha',alpha};
+    const loader=new ReleaseLoader(input);
+    expect(loader.release.alpha).toEqual(alpha);expect(Object.isFrozen(loader.release.alpha)).toBe(true);
+    expect(Object.isFrozen(loader.release.alpha?.uncertainty_notes)).toBe(true);
+    expect(Object.isFrozen(input.alpha)).toBe(false);
+    input.alpha.uncertainty_notes[0]='Changed transport input';
+    expect(loader.release.alpha?.uncertainty_notes[0]).toBe('Synthetic transport only; geometry is intentionally absent.');
+    vi.stubGlobal('fetch',async(url:URL)=>new Response(payloads[Number(url.pathname.split('/').at(-1)!.split('.')[0])] as BodyInit));
+    const scene=await loader.window(2);
+    expect(scene).toMatchObject({set_number:'99999',status:'needs_review',physical_build_check:'not_run',reviews:[]});
+    expect(scene.steps[2].introduced_instance_ids).toEqual([]);expect(scene.steps[2].poses).toEqual(fixture.steps[2].poses);
+    expect(parseRelease(manifest)).not.toHaveProperty('alpha');
+  });
+  it('rejects misleading alpha claims, unknown release kinds and unbounded disclosures',async()=>{
+    vi.stubGlobal('location',{origin:'http://localhost:5173'});
+    const {manifest}=await releaseFixture();
+    const alpha={artifact_kind:'pdf_assisted_alpha_completion',generation_mode:'alpha_fast',source_coverage:'all_pages_processed_approximate_unverified',
+      coverage_text:'Reported coverage (unverified): synthetic transport only.',uncertainty_notes:['Geometry deliberately absent.'],accuracy:'unverified',human_review:'not_run',physical_build:'not_run'};
+    const input={...manifest,status:'needs_review',release_kind:'unverified_alpha',alpha};
+    for(const change of [{accuracy:'verified'},{human_review:'pass'},{physical_build:'pass'},
+      {artifact_kind:'automatic_conversion'},{generation_mode:'standard'},{source_coverage:'complete'},
+      {source_coverage:'independently_verified_unverified'},{source_coverage:'unverified'.repeat(13)},
+      {coverage_text:'All source coverage verified.'},{coverage_text:'Reported coverage (unverified): '+'x'.repeat(1000)},
+      {uncertainty_notes:[]},{uncertainty_notes:['x'.repeat(2001)]},{uncertainty_notes:Array(101).fill('note')},
+      {uncertainty_notes:Array(11).fill('é'.repeat(2000))},{uncertainty_notes:[{text:'Invalid object'}]}])
+      expect(()=>parseRelease({...input,alpha:{...alpha,...change}})).toThrow('alpha metadata');
+    for(const change of [{status:'human_reviewed'},{status:'agent_reviewed'},{geometry_check:'pass'},{connector_check:'pass'},{physical_build_check:'pass'}])
+      expect(()=>parseRelease({...input,...change})).toThrow('alpha check metadata');
+    expect(()=>parseRelease({...manifest,alpha})).toThrow('alpha metadata without release kind');
+    expect(()=>parseRelease({...input,release_kind:'automatic'})).toThrow('release kind');
+    expect(()=>parseRelease({...input,alpha:undefined})).toThrow('alpha metadata');
   });
 });

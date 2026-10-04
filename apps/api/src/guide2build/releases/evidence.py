@@ -28,6 +28,12 @@ def verify_source_evidence(scene: SceneV2, validation: ReleaseValidation, regist
         raise ValueError('Coverage denominator differs from independent source index')
     if set(coverage.sources) != {s.source_sha256 for s in scene.sources}:
         raise ValueError('Coverage index source hashes differ')
+    verify_source_pins(scene, registry)
+    return coverage
+
+
+def verify_source_pins(scene: SceneV2, registry: dict):
+    """Official source identities remain mandatory for every publication category."""
     if registry.get('schema_version') != 1 or not isinstance(registry.get('sources'), list):
         raise ValueError('Trusted source pin registry is missing or invalid')
     for source in scene.sources:
@@ -38,4 +44,3 @@ def verify_source_evidence(scene: SceneV2, validation: ReleaseValidation, regist
             raise ValueError('Scene is not bound to a pinned official source')
     if any('synthetic' in p.part_id.lower() or 'synthetic' in p.geometry_ref.lower() for p in scene.instances):
         raise ValueError('Synthetic fixture geometry is not a release input')
-    return coverage

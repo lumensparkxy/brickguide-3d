@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "stage": "ten_set_local_alpha_generated_and_verified",
-  "active_milestone": "accuracy_iteration_ready",
+  "stage": "alpha_models_prepared_and_privately_staged",
+  "active_milestone": "publish_retained_alpha_models",
   "web_app_test_followup": {
     "status": "passed",
     "portal_url": "http://127.0.0.1:4175/",
@@ -72,7 +72,7 @@
   "human_review_status": "not_run",
   "physical_build_status": "not_run",
   "github_issue_mapping": {},
-  "next_action": "The named set dropdown is verified, pushed to private GitHub and live in production. Begin the next reconstruction accuracy iteration from the retained local alpha evidence. The13 alpha samples remain local; their public release path and content approval are still unresolved.",
+  "next_action": "Push/deploy the tested alpha-capable code, then obtain approval of the13 exact hashes in ALPHA_PRODUCTION_RELEASE.md and publish them. Reconstruction accuracy remains unverified.",
   "evidence_report": "docs/execution/VALIDATION_REPORT.md",
   "source_pages": 8,
   "toolchain": {
@@ -425,7 +425,7 @@
       "total_panels": 12,
       "error": {
         "code": "construction_blocked",
-        "message": "Unresolved assembly evidence: Panel 3 attachment pose is uncertain: I cannot confidently determine the subassembly’s exact stud offset and vertical placement relative to the existing quarter-circle-cutout plates. An append-only delta would require guessing those transforms."
+        "message": "Unresolved assembly evidence: Panel 3 attachment pose is uncertain: I cannot confidently determine the subassembly\u2019s exact stud offset and vertical placement relative to the existing quarter-circle-cutout plates. An append-only delta would require guessing those transforms."
       },
       "worker_running": false,
       "new_model_calls": 2,
@@ -684,7 +684,7 @@
     },
     "blocker": {
       "code": "instruction_repair_exhausted",
-      "message": "Instruction 8 used 5/5 attempts. Unresolved source evidence: Panel 8’s transparent 1 × 2 plate cannot be assigned an exact colour code: the supplied image does not resolve transparent clear versus transparent light blue. The supplied metadata provides no colour evidence to settle this ambiguity.",
+      "message": "Instruction 8 used 5/5 attempts. Unresolved source evidence: Panel 8\u2019s transparent 1 \u00d7 2 plate cannot be assigned an exact colour code: the supplied image does not resolve transparent clear versus transparent light blue. The supplied metadata provides no colour evidence to settle this ambiguity.",
       "evidence": "/Users/admin/Documents/ChatGPT/brickguide-3d/var/engine/jobs/a5cc1e914bb84df2a211a52d62cbb281/proposals/8404bb011fdf4d69842acfd5d3fd3935"
     },
     "portal_qa": "passed_for_partial_candidate",
@@ -910,5 +910,26 @@
     "human_review": "not_run",
     "physical_build": "not_run",
     "evidence": "var/evidence/home-set-dropdown/"
+  },
+  "alpha_production_release": {
+    "status": "prepared_verified_and_privately_staged_pending_exact_hash_approval",
+    "report": "docs/execution/ALPHA_PRODUCTION_RELEASE.md",
+    "campaign_sha256": "4bdd5f6ec3f9dc6ff64e60d9515d02f44d26b4c1f4596180627d505903d13f82",
+    "booklets": 13,
+    "sets": 10,
+    "release_kind": "unverified_alpha",
+    "accuracy": "unverified",
+    "human_review": "not_run",
+    "physical_build": "not_run",
+    "backend_tests_passed": 472,
+    "frontend_tests_passed": 48,
+    "browser_tests_passed": 36,
+    "browser_tests_skipped": 3,
+    "actual_first_final_snapshot_views": 26,
+    "public_model_publication": "pending_exact_hash_user_approval",
+    "evidence": "var/evidence/alpha-production/release-index.json",
+    "independent_security_review": "passed_software_and_actual_export_gates_only",
+    "hashes_after_tightened_gates": "unchanged",
+    "private_staging": "complete_remote_bytes_and_generations_verified"
   }
 }

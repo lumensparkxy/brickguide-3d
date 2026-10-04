@@ -10,7 +10,7 @@ Use `lumensparkxy`, release database `guide2build`, request database `guide2buil
 
 **Run `approve` only after the user explicitly approves that exact release hash.** Google authentication identifies the principal; it does not replace the user's per-version decision. Agents must not invoke approval merely because credentials are available.
 
-## Prepare a reviewable bundle
+## Prepare a reviewed tutorial bundle
 
 A release requires:
 
@@ -95,6 +95,27 @@ Public requests deduplicate by set number, admit at most 100 new set numbers per
 Package validation proves typed structure, official-source binding, declared coverage consistency, real dependency hashes and explicit review gates. It does not independently prove that every pose matches the PDF, that a coverage reviewer was correct, or that the model was physically assembled. Keep automatic, corrected, agent-reviewed, human-approved and physically tested outcomes distinct.
 
 No current blocked or partial candidate may bypass these gates. Test fixtures and mock PNGs used by the software tests are not production tutorial evidence. Cloud IAM, transfers and deployment require live verification separately from passing local tests.
+
+## Publish an explicitly unverified alpha model
+
+The separate `unverified_alpha` category exposes a frozen PDF-assisted model for exploration. It preserves `needs_review`, `accuracy: unverified`, and assembly/connector/physical checks as `not_run`. It cannot be presented as a reviewed tutorial or an automatic reconstruction success. The reviewed tutorial gate above is unchanged. A publication approval authorizes public distribution of one exact hash; it does not record a human assembly review.
+
+Alpha packaging requires a bounded disclosure (`AlphaDisclosure`), an exact `reported_unverified` coverage index, official-source pins, an actual final Three.js viewport PNG bound to the canonical scene and PNG hashes, and the same verified individual-part dependency closure. Uncertainty notes are retained. Later cumulative booklets distinguish this booklet's snapshots from cumulative snapshots. Geometry component counts are not certified retail piece totals.
+
+```sh
+.venv/bin/python tools/release.py package-alpha \
+  --scene var/alpha/scene-v2.json \
+  --disclosure var/alpha/disclosure.json \
+  --source-index var/alpha/source-index.json \
+  --preview-binding var/alpha/preview-binding.json \
+  --geometry-root var/alpha/geometry \
+  --preview var/alpha/final-viewport.png \
+  --output var/releases/alpha-version
+```
+
+The preview binding identifies `scene_sha256`, `preview_sha256`, `renderer: threejs`, and the actual final `rendered_step_id`. Only typed public disclosures, snapshots, geometry, viewport PNG and sanitized provenance are exported. Official PDFs, page crops, completion reports, prompts, engine jobs and credentials remain private. Original DAT notices and author/source/licence references remain intact; colour configuration rights are recorded separately from DAT licence headers.
+
+Use the same `verify`, private `stage`, exact-hash `approve`, and compare-and-swap `publish` commands. The user approval requirement in **Prerequisites and authority** applies to alpha releases too. Cloud transfer/validation supports `--transfer-workers 1` through `8`; this changes bounded per-file transfer concurrency, not ordering, byte verification or approval. Heads remain sequential and generation checked. Public UI labels this category **ALPHA MODEL · UNVERIFIED** with **Open alpha model**, and never enables source-image or private review APIs.
 
 
 ## Add a new set without a website rebuild

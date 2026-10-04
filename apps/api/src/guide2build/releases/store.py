@@ -5,9 +5,10 @@ import os
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Literal
 from pydantic import Field
 from guide2build.core.models import StrictModel
-from guide2build.releases.models import Source, canonical
+from guide2build.releases.models import Source, canonical, digest
 
 CATALOGUE_MAX_ENTRIES = 1000
 CATALOGUE_MAX_BYTES = 500_000
@@ -18,18 +19,19 @@ class PublishedEntry(StrictModel):
     guide_id: str = Field(pattern=r"^[a-z0-9-]{1,80}$")
     release_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     source: Source
+    release_kind: Literal['unverified_alpha'] | None = None
 
 
 def publication_entry(manifest):
     source = next((s for s in manifest["sources"] if s["guide_id"] == manifest["guide_id"]), manifest["sources"][0])
     return PublishedEntry.model_validate({k:manifest[k] for k in ("set_number", "guide_id", "release_sha256")}
-        | {"source":source}).model_dump(mode="json")
+        | {"source":source, "release_kind":manifest.get('release_kind')}).model_dump(mode="json", exclude_none=True)
 
 
 def validate_catalogue(entries):
     if not isinstance(entries, list) or len(entries) > CATALOGUE_MAX_ENTRIES:
         raise ValueError("Published catalogue entry bound")
-    validated = [PublishedEntry.model_validate(e).model_dump(mode="json") for e in entries]
+    validated = [PublishedEntry.model_validate(e).model_dump(mode="json", exclude_none=True) for e in entries]
     keys = [(e["set_number"], e["guide_id"]) for e in validated]
     if len(set(keys)) != len(keys) or len(canonical(validated)) > CATALOGUE_MAX_BYTES:
         raise ValueError("Published catalogue identity or byte bound")
@@ -141,6 +143,8 @@ class SQLiteReleaseStore:
             if (old[0] if old else None) != expected_head:
                 raise ValueError('Stale release head')
             manifest = json.loads(db.execute('SELECT manifest FROM releases WHERE hash=?', (release_hash,)).fetchone()[0])
+            from guide2build.releases.packaging import verify_manifest
+            verify_manifest(manifest)
             entry = publication_entry(manifest)
             current = [json.loads(r[0]) for r in db.execute('SELECT metadata FROM public_catalogue')]
             replace_catalogue_entry(current, entry)  # fail before changing either pointer
@@ -220,6 +224,8 @@ class FirestoreReleaseStore:
     def stage(self, manifest):
         from guide2build.releases.packaging import verify_manifest
         verify_manifest(manifest)
+        entry = publication_entry(manifest)
+        entry_sha256 = digest(entry)
         ref = self.db.collection('releases').document(manifest['release_sha256'])
         @self.fs.transactional
         def write(tx):
@@ -227,10 +233,12 @@ class FirestoreReleaseStore:
             if old.exists:
                 if old.to_dict()['identity'] != {k: manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')}:
                     raise ValueError('Immutable release differs')
-                if old.to_dict().get('catalogue_entry') != publication_entry(manifest):
-                    tx.update(ref, {'catalogue_entry': publication_entry(manifest)})
+                if (old.to_dict().get('catalogue_entry') != entry
+                        or old.to_dict().get('catalogue_entry_sha256') != entry_sha256):
+                    tx.update(ref, {'catalogue_entry': entry, 'catalogue_entry_sha256': entry_sha256})
                 return
-            tx.create(ref, {'catalogue_entry': publication_entry(manifest), 'identity': {k: manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')}, 'staged_at': utcnow()})
+            tx.create(ref, {'catalogue_entry': entry, 'catalogue_entry_sha256': entry_sha256,
+                           'identity': {k: manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')}, 'staged_at': utcnow()})
         write(self.db.transaction())
 
     def approve(self, release_hash, identity):
@@ -256,7 +264,9 @@ class FirestoreReleaseStore:
             catalogue = self.db.collection('catalogue').document('published')
             current = catalogue.get(transaction=tx)
             entries = validate_catalogue(current.to_dict().get('entries', [])) if current.exists else []
-            entry = PublishedEntry.model_validate(release.to_dict()['catalogue_entry']).model_dump(mode='json')
+            entry = PublishedEntry.model_validate(release.to_dict()['catalogue_entry']).model_dump(mode='json', exclude_none=True)
+            if digest(entry) != release.to_dict().get('catalogue_entry_sha256'):
+                raise ValueError('Published metadata differs from its staged receipt')
             if any(entry[k] != manifest[k] for k in ('set_number', 'guide_id', 'release_sha256')):
                 raise ValueError('Published metadata does not bind the approved release')
             entries = replace_catalogue_entry(entries, entry)

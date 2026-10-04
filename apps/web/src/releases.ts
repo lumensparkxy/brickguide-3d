@@ -6,12 +6,17 @@ export const REQUEST_RECORDED = 'This build isn’t ready yet. We’ve added it 
 export interface PortalConfig { mode: 'local' | 'public' | 'preview'; source_images: boolean; requests_enabled: boolean; }
 export function parseConfig(value: unknown): PortalConfig {
   const config = value as PortalConfig;
-  if (!config || !['local','public','preview'].includes(config.mode) || typeof config.source_images !== 'boolean' || typeof config.requests_enabled !== 'boolean') throw new Error('Website settings could not be verified. Please try again.');
+  if (!config || !['local','public','preview'].includes(config.mode) || typeof config.source_images !== 'boolean' || typeof config.requests_enabled !== 'boolean' || config.mode==='public'&&config.source_images) throw new Error('Website settings could not be verified. Please try again.');
   return config;
 }
 interface Chunk { index:number; path:string; sha256:string; bytes:number; step_ids:string[]; }
 interface IndexedStep extends Omit<StepSnapshot,'poses'|'visible_instance_ids'|'active_instance_ids'|'snapshot_loaded'> { chunk_index:number; visible_instance_count:number; active_instance_count:number; }
-interface Release { scene:SceneManifest; chunks:Chunk[]; stepIndex:IndexedStep[]; assetBase:string; introducedAt:Record<string,number>; }
+export interface AlphaReleaseMetadata {
+  artifact_kind: 'pdf_assisted_alpha_completion'; generation_mode: 'alpha_fast';
+  source_coverage: string; coverage_text: string; uncertainty_notes: string[];
+  accuracy: 'unverified'; human_review: 'not_run'; physical_build: 'not_run';
+}
+interface Release { scene:SceneManifest; chunks:Chunk[]; stepIndex:IndexedStep[]; assetBase:string; introducedAt:Record<string,number>; release_kind?:'unverified_alpha'; alpha?:AlphaReleaseMetadata; }
 const error = (message:string):never => {throw new Error(`Invalid tutorial release: ${message}`);};
 const hash = (value:unknown):value is string => typeof value==='string' && /^[a-f0-9]{64}$/.test(value);
 const official = (value:unknown) => {try {const url=new URL(String(value));return url.protocol==='https:'&&(url.hostname==='lego.com'||url.hostname.endsWith('.lego.com'));}catch{return false;}};
@@ -27,10 +32,27 @@ const validatePart=ajv.compile<PartInstance>({$defs:schema.$defs,...schema.$defs
 const validateStep=ajv.compile<StepSnapshot>({$defs:schema.$defs,...schema.$defs.StepSnapshot});
 const group=(step:Pick<StepSnapshot,'section_id'|'main_step_number'|'printed_step_number'|'step_id'>)=>`${step.section_id??''}:${step.printed_step_number===null?step.step_id:step.main_step_number}`;
 const adapted=(step:Record<string,unknown>,ordinal:number) => ({...step,printed_step_number:step.main_step_number,main_step_number:step.main_step_number===null?ordinal+1:step.main_step_number});
+function releaseMetadata(data:Record<string,any>):Pick<Release,'release_kind'|'alpha'> {
+  if(data.release_kind===undefined){if(data.alpha!==undefined)error('alpha metadata without release kind');return {};}
+  if(data.release_kind!=='unverified_alpha')error('release kind');
+  const alpha=data.alpha as AlphaReleaseMetadata;
+  const text=(value:unknown,max:number):value is string=>typeof value==='string'&&value.trim().length>0&&value.length<=max;
+  if(!alpha||alpha.artifact_kind!=='pdf_assisted_alpha_completion'||alpha.generation_mode!=='alpha_fast'
+      ||alpha.accuracy!=='unverified'||alpha.human_review!=='not_run'||alpha.physical_build!=='not_run'
+      ||!text(alpha.source_coverage,120)||!alpha.source_coverage.includes('unverified')||alpha.source_coverage.includes('independently_verified')
+      ||!text(alpha.coverage_text,1000)||!alpha.coverage_text.startsWith('Reported coverage (unverified): ')
+      ||!Array.isArray(alpha.uncertainty_notes)||alpha.uncertainty_notes.length<1||alpha.uncertainty_notes.length>100
+      ||alpha.uncertainty_notes.some(note=>!text(note,2000))
+      ||alpha.uncertainty_notes.reduce((total,note)=>total+new TextEncoder().encode(note).byteLength,0)>40000)error('alpha metadata');
+  if(data.status!=='needs_review'||['geometry_check','connector_check','physical_build_check'].some(key=>data[key]!=='not_run'))error('alpha check metadata');
+  return {release_kind:'unverified_alpha',alpha};
+}
 export function parseRelease(value:unknown):Release {
-  const data=value as Record<string,any>;
+  // Keep transport input separate from the immutable metadata and snapshot state.
+  const data=structuredClone(value) as Record<string,any>;
   if(!data||data.schema_version!=='2.0'||!/^\d{4,7}$/.test(data.set_number)||!/^[a-z0-9-]+$/.test(data.guide_id)||typeof data.revision!=='string'||!hash(data.source_sha256)||!hash(data.release_sha256)||data.coordinate_system!=='right_handed_y_up_ldu')error('identity');
   if(!['candidate','needs_review','agent_reviewed','human_reviewed'].includes(data.status)||['geometry_check','connector_check','physical_build_check'].some(key=>!['pass','fail','not_run'].includes(data[key])))error('check metadata');
+  const metadata=releaseMetadata(data);
   const base=assetBase(data.asset_base_url); const geometry=assetBase(data.geometry_base_url);
   if(!geometry.startsWith(base))error('geometry outside release');
   if(!Array.isArray(data.sources)||!data.sources.length||data.sources.some((s:any)=>!hash(s.source_sha256)||typeof s.guide_id!=='string'||!official(s.official_url)||!Number.isInteger(s.page_count)||s.page_count<1))error('official source metadata');
@@ -62,7 +84,7 @@ export function parseRelease(value:unknown):Release {
   if(introduced.size!==ids.size||chunks.flatMap(c=>c.step_ids).join('\0')!==stepIndex.map(s=>s.step_id).join('\0'))error('coverage');
   // Empty poses are transport placeholders only. The workspace never renders an unloaded snapshot.
   const scene:SceneManifest={schema_version:'1.0',set_number:data.set_number,guide_id:data.guide_id,revision:data.revision,source_sha256:data.source_sha256,coordinate_system:data.coordinate_system,status:data.status,geometry_check:data.geometry_check,connector_check:data.connector_check,physical_build_check:data.physical_build_check,instances:data.instances,reviews:[],sources:data.sources,geometry_base_url:geometry,steps:stepIndex.map(({chunk_index,visible_instance_count,active_instance_count,...step})=>({...step,visible_instance_ids:[],active_instance_ids:[],poses:{},snapshot_loaded:false}))};
-  return freeze({scene,chunks,stepIndex,assetBase:base,introducedAt});
+  return freeze({scene,chunks,stepIndex,assetBase:base,introducedAt,...metadata});
 }
 const canonical=(value:any):string=>JSON.stringify(value&&typeof value==='object'?Array.isArray(value)?value.map(v=>JSON.parse(canonical(v))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])):value);
 export class ReleaseLoader {

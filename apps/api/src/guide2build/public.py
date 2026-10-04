@@ -11,7 +11,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import Field
 from guide2build.core.models import StrictModel
-from guide2build.releases.store import SQLiteReleaseStore, FirestoreReleaseStore, RequestLimit
+from guide2build.releases.store import (
+    SQLiteReleaseStore, FirestoreReleaseStore, RequestLimit, publication_entry, validate_catalogue,
+)
 
 ROOT = Path(__file__).resolve().parents[4]
 MESSAGE = 'This build isn’t ready yet. We’ve added it to our building list. Come back later to see what’s new!'
@@ -42,11 +44,11 @@ def create_app(store=None, catalogue_path: Path | None = None, web_dist: Path | 
 
     def published_catalogue():
         if not isinstance(store, FirestoreReleaseStore):
-            return store.published_catalogue()
+            return validate_catalogue(store.published_catalogue())
         with cache_lock:
             now = time.monotonic()
             if now >= catalogue_cache[0]:
-                catalogue_cache[:] = [now + 30, store.published_catalogue()]
+                catalogue_cache[:] = [now + 30, validate_catalogue(store.published_catalogue())]
             return catalogue_cache[1]
 
     def read_release(set_number, guide_id):
@@ -54,16 +56,32 @@ def create_app(store=None, catalogue_path: Path | None = None, web_dist: Path | 
                       if e['set_number'] == set_number and e['guide_id'] == guide_id), None)
         if entry is None:
             return None  # random searches never create per-set database reads or cache entries
+        def checked_head():
+            from guide2build.releases.packaging import verify_manifest
+            try:
+                manifest = store.head(set_number, guide_id)
+                if manifest is None:
+                    return None
+                verify_manifest(manifest)
+                if publication_entry(manifest) != entry:
+                    raise ValueError('Publication catalogue differs from its manifest')
+                return manifest
+            except ValueError:
+                error(503, 'publication_state_unavailable',
+                      'This model’s publication status is updating. Please try again shortly.')
         if not isinstance(store, FirestoreReleaseStore):
-            return store.head(set_number, guide_id)
+            return checked_head()
         with cache_lock:
             key = (set_number, guide_id, entry['release_sha256'])
             cached = release_cache.get(key)
             now = time.monotonic()
             if cached is not None and now < cached[0]:
+                if cached[1] is not None and publication_entry(cached[1]) != entry:
+                    error(503, 'publication_state_unavailable',
+                          'This model’s publication status is updating. Please try again shortly.')
                 release_cache.move_to_end(key)
                 return cached[1]
-            value = store.head(set_number, guide_id)
+            value = checked_head()
             release_cache[key] = (now + 30, value)
             release_cache.move_to_end(key)
             while len(release_cache) > 4:
@@ -125,10 +143,14 @@ def create_app(store=None, catalogue_path: Path | None = None, web_dist: Path | 
                                 expected_page_count=entry['source']['page_count'])
             metadata.update(tutorial_available=entry is not None, status='published' if entry else 'not_ready',
                 release_manifest_url=f"/api/v1/sets/{set_number}/guides/{guide_id}/release" if entry else None)
+            if entry and entry.get('release_kind') == 'unverified_alpha':
+                metadata.update(release_kind='unverified_alpha', alpha_available=True, status='alpha_unverified')
             guides.append(metadata)
+        status = ('published' if any(e.get('release_kind') != 'unverified_alpha' for e in published.values())
+                  else 'alpha_unverified' if published else 'not_ready')
         return {'set_number': set_number, 'name': item['name'] if item else f'Set {set_number}',
                 'official_page': item['official_page'] if item else next(iter(published.values()))['source']['official_url'],
-                'guides': guides, 'status': 'published' if published else 'not_ready'}
+                'guides': guides, 'status': status}
 
     @app.get('/api/v1/sets/{set_number}/guides/{guide_id}/release')
     def release(set_number: str, guide_id: str):

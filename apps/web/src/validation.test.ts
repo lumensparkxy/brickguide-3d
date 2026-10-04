@@ -19,6 +19,17 @@ describe('runtime scene contract',()=>{
     expect(parseSet({...source,guides:[{...source.guides[0],expected_main_steps:12,tutorial_available:true}]}).guides[0].tutorial_available).toBe(true);
     for (const change of [{expected_main_steps:0},{expected_main_steps:-1},{expected_main_steps:'unknown'},{tutorial_available:'true'}]) expect(()=>parseSet({...source,guides:[{...source.guides[0],...change}]})).toThrow('invalid set');
   });
+  it('requires a consistent public alpha availability status and preserves legacy guide metadata',()=>{
+    const guide={guide_id:'synthetic',label:'Synthetic transport fixture',pdf_url:'https://www.lego.com/test.pdf',expected_main_steps:null,tutorial_available:true};
+    const source={set_number:'99999',name:'Synthetic transport fixture',official_page:'https://www.lego.com/',guides:[guide]};
+    const alpha={...guide,release_kind:'unverified_alpha',alpha_available:true,status:'alpha_unverified'};
+    expect(parseSet({...source,guides:[alpha]},true).guides[0]).toMatchObject(alpha);
+    expect(parseSet(source,true).guides[0]).not.toHaveProperty('release_kind');
+    for(const change of [{release_kind:'reviewed'},{status:'published'},{tutorial_available:false},{alpha_available:false},{alpha_available:'true'}])
+      expect(()=>parseSet({...source,guides:[{...alpha,...change}]},true)).toThrow('invalid alpha');
+    for(const change of [{status:'alpha_unverified'},{alpha_available:true}])
+      expect(()=>parseSet({...source,guides:[{...guide,...change}]},true)).toThrow('invalid alpha');
+  });
 });
 
 describe('runtime processing contracts',()=>{

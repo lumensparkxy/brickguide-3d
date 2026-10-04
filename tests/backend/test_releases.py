@@ -113,12 +113,13 @@ def test_package_is_atomic_allowlisted_and_hash_checked(v2, tmp_path, monkeypatc
     root = tmp_path/'geometry'
     (root/'parts').mkdir(parents=True)
     refs = sorted({i.geometry_ref for i in v2.instances})
-    resource = b'0 Test geometry\n0 !LDRAW_ORG Part\n0 !LICENSE Unit test only\n'
+    # Synthetic authored test input; no bundle from this test is published.
+    resource = b'0 Test geometry\n0 !LDRAW_ORG Part\n0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt\n'
     records = {}
     for ref in refs:
         (root/ref).write_bytes(resource)
         records[ref] = dict(url='https://library.ldraw.org/library/official/'+ref,
-                            sha256=hashlib.sha256(resource).hexdigest(), dependencies=[], classification='Part', notices=['0 !LICENSE Unit test only'])
+                            sha256=hashlib.sha256(resource).hexdigest(), dependencies=[], classification='Part', notices=['0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt'])
     (root/'LDConfig.ldr').write_bytes(b'0 material')
     material = dict(url='https://library.ldraw.org/library/official/LDConfig.ldr',sha256=hashlib.sha256(b'0 material').hexdigest())
     (root/'provenance.json').write_text(json.dumps(dict(resources=records, materials={'LDConfig.ldr':material},file_map={})))

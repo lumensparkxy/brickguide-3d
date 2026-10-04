@@ -28,5 +28,8 @@ export interface SceneManifest {
   reviews: { actor_type: 'agent' | 'human'; actor_id: string; reviewed_revision: string;
     evidence_paths: string[]; decision: 'accepted' | 'changes_requested'; recorded_at: string }[];
 }
-export interface Guide { guide_id: string; label: string; pdf_url: string; expected_main_steps: number | null; tutorial_available: boolean; }
+export interface Guide {
+  guide_id: string; label: string; pdf_url: string; expected_main_steps: number | null; tutorial_available: boolean;
+  release_kind?: 'unverified_alpha'; alpha_available?: boolean; status?: 'published' | 'not_ready' | 'alpha_unverified';
+}
 export interface SetInfo { set_number: string; name: string | null; official_page: string | null; guides: Guide[]; }

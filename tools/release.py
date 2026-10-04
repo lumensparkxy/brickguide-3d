@@ -26,13 +26,23 @@ def main():
     p.add_argument('--geometry-root', type=Path, default=ROOT / 'var/public/ldraw')
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--preview', type=Path, required=True, help='Actual model-render PNG for this exact scene')
+    p = sub.add_parser('package-alpha', help='Package a disclosed unverified alpha; never a reviewed tutorial')
+    p.add_argument('--scene', type=Path, required=True)
+    p.add_argument('--disclosure', type=Path, required=True)
+    p.add_argument('--source-index', type=Path, required=True)
+    p.add_argument('--preview-binding', type=Path, required=True)
+    p.add_argument('--geometry-root', type=Path, required=True)
+    p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--preview', type=Path, required=True)
     p = sub.add_parser('verify')
     p.add_argument('directory', type=Path)
     p = sub.add_parser('stage')
     p.add_argument('directory', type=Path)
+    p.add_argument('--transfer-workers', type=int, choices=range(1, 9), default=1)
     for command in ('approve', 'publish', 'rollback'):
         p = sub.add_parser(command)
         p.add_argument('--release', required=True)
+        p.add_argument('--transfer-workers', type=int, choices=range(1, 9), default=1)
         if command != 'approve':
             p.add_argument('--expected-head', default=None)
     args = parser.parse_args()
@@ -46,15 +56,27 @@ def main():
         manifest = verify_bundle(args.directory)
         print(json.dumps({'release_sha256': manifest['release_sha256'], 'state': 'verified'}))
         return
+    if args.command == 'package-alpha':
+        from guide2build.releases.alpha import package_alpha_release
+        manifest = package_alpha_release(SceneV2.model_validate_json(args.scene.read_text()),
+            json.loads(args.disclosure.read_text()), args.geometry_root, args.output, args.preview,
+            source_index=json.loads(args.source_index.read_text()),
+            preview_binding=json.loads(args.preview_binding.read_text()))
+        print(json.dumps({'release_sha256': manifest['release_sha256'], 'state': 'packaged',
+                          'release_kind': manifest['release_kind']}))
+        return
     project = os.getenv('GOOGLE_CLOUD_PROJECT', 'lumensparkxy')
     os.environ.setdefault('CLOUDSDK_CONFIG', str(ROOT / 'var/gcloud'))
+    os.environ.setdefault('CLOUDSDK_PYTHON', sys.executable)
+    os.environ.setdefault('CLOUDSDK_CORE_DISABLE_USAGE_REPORTING', 'true')
     adc = ROOT / 'var/gcloud/application_default_credentials.json'
     if adc.is_file():
         os.environ.setdefault('GOOGLE_APPLICATION_CREDENTIALS', str(adc))
     credentials = role_credentials(project, 'uploader' if args.command == 'stage' else 'publisher')
     store = FirestoreReleaseStore(project, credentials=credentials)
     cloud = GCSReleases(project, os.getenv('GUIDE2BUILD_STAGING_BUCKET', project + '-guide2build-staging'),
-                        os.getenv('GUIDE2BUILD_PUBLIC_BUCKET', project + '-guide2build-assets'), credentials=credentials)
+                        os.getenv('GUIDE2BUILD_PUBLIC_BUCKET', project + '-guide2build-assets'), credentials=credentials,
+                        transfer_workers=getattr(args, 'transfer_workers', 1))
     if args.command == 'stage':
         manifest = cloud.stage(args.directory)
         print(json.dumps({'release_sha256': manifest['release_sha256'], 'state': 'awaiting_approval'}))

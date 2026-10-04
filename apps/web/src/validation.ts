@@ -41,5 +41,13 @@ export function parseSet(value: unknown, publicMode = false): SetInfo {
   const official = (url: unknown) => { if (typeof url !== 'string') return false; try { const u = new URL(url); return u.protocol === 'https:' && (u.hostname === 'lego.com' || u.hostname.endsWith('.lego.com')); } catch { return false; } };
   const unknown = publicMode && data?.name === null && data?.official_page === null && Array.isArray(data?.guides) && data.guides.length === 0;
   if (!data || typeof data.set_number !== 'string' || !/^\d{4,7}$/.test(data.set_number) || (!unknown && (typeof data.name !== 'string' || !official(data.official_page))) || !Array.isArray(data.guides) || data.guides.some(g => !g || !/^[a-z0-9-]+$/.test(g.guide_id) || typeof g.label !== 'string' || !official(g.pdf_url) || (g.expected_main_steps !== null && (!Number.isInteger(g.expected_main_steps) || g.expected_main_steps < 1)) || (g.tutorial_available !== undefined && typeof g.tutorial_available !== 'boolean'))) throw new Error('The server returned invalid set information.');
+  for(const guide of data.guides){
+    if((guide.release_kind!==undefined&&guide.release_kind!=='unverified_alpha')
+      ||(guide.alpha_available!==undefined&&typeof guide.alpha_available!=='boolean')
+      ||(guide.status!==undefined&&!['published','not_ready','alpha_unverified'].includes(guide.status))
+      ||(guide.release_kind==='unverified_alpha'&&(guide.tutorial_available!==true||guide.alpha_available!==true||guide.status!=='alpha_unverified'))
+      ||(guide.release_kind===undefined&&(guide.alpha_available===true||guide.status==='alpha_unverified')))
+      throw new Error('The server returned invalid alpha model information.');
+  }
   return {...data,guides:data.guides.map(g=>({...g,tutorial_available:g.tutorial_available ?? false}))};
 }

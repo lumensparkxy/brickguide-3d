@@ -47,14 +47,17 @@ def install_candidate(preview):
     geometry = directory / 'geometry'
     geometry.mkdir()
     records = {}
-    data = b'0 Synthetic test only\n0 !LDRAW_ORG Part\n0 !LICENSE Test only\n'
+    # Authored synthetic transport fixture; this declaration exercises the grammar,
+    # not licence or reconstruction evidence for any downloaded target-model asset.
+    license_line = '0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt'
+    data = ('0 Synthetic test only\n0 !LDRAW_ORG Part\n' + license_line + '\n').encode()
     for ref in {part.geometry_ref for part in scene.instances}:
         file = geometry / ref
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_bytes(data)
         records[ref] = {'url': 'https://library.ldraw.org/library/official/' + ref,
                         'sha256': hashlib.sha256(data).hexdigest(), 'dependencies': [],
-                        'classification': 'Part', 'notices': ['0 !LICENSE Test only']}
+                        'classification': 'Part', 'notices': [license_line]}
     (geometry / 'LDConfig.ldr').write_bytes(b'0 Test material')
     material = {'url': 'https://library.ldraw.org/library/official/LDConfig.ldr',
                 'sha256': hashlib.sha256(b'0 Test material').hexdigest()}
