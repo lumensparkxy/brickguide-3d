@@ -16,9 +16,12 @@ try {
   for (const entry of index.releases) {
     const context = await browser.newContext({viewport: {width: 1440, height: 1000}, reducedMotion: 'reduce'});
     const page = await context.newPage();
-    const errors = [], requests = [], failed = [];
+    const errors = [], warnings = [], requests = [], failed = [];
     page.on('pageerror', e => errors.push(e.message));
-    page.on('console', m => {if (m.type() === 'error') errors.push(m.text());});
+    page.on('console', m => {
+      if (m.type() === 'error') errors.push(m.text());
+      if (m.type() === 'warning') warnings.push(m.text());
+    });
     page.on('request', r => requests.push(r.url()));
     page.on('response', r => {if (r.status() >= 400) failed.push({url: r.url(), status: r.status()});});
     const identity = `${entry.set_number}-${entry.guide_id}`;
@@ -71,8 +74,11 @@ try {
       expect(requests.filter(url => /\/api\/v1\/(sources|reconstructions|conversions|jobs|engine-preview)\b|\.pdf(?:\?|$)|assets-local/.test(url))).toEqual([]);
       expect(errors).toEqual([]);
       expect(failed).toEqual([]);
+      const gpuReadbackWarnings = warnings.filter(message => /^\[\.WebGL-[^\]]+\]GL Driver Message .*GPU stall due to ReadPixels/.test(message));
+      const applicationWarnings = warnings.filter(message => !gpuReadbackWarnings.includes(message));
+      expect(applicationWarnings).toEqual([]);
       const check = {identity, release_sha256: entry.release_sha256, snapshots: manifest.step_index.length,
-        firstReadyMs, firstAndFinalReadyMs: performance.now() - started, errors, failed,
+        firstReadyMs, firstAndFinalReadyMs: performance.now() - started, errors, failed, warnings, applicationWarnings, gpuReadbackWarnings,
         requests: requests.length, passed: true, scope: 'First and final snapshot UI/geometry; no assembly accuracy claim'};
       checks.push(check);
       console.log(JSON.stringify(check));

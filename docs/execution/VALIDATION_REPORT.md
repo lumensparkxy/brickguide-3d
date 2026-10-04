@@ -969,3 +969,48 @@ checkpoint; the13 source-assisted alpha booklets stay in the running4175 loopbac
 reports no available tutorials for these ten sets; no alpha content, PDF crops or reconstruction engine
 is exposed. Reconstruction accuracy, human review and physical-build status remain unchanged/unverified.
 Safari and real touch-device checks were not run. No new provider inference or source/scene edits occurred.
+
+## Alpha models published and verified — 4 October 2026
+
+The user approved the exact 13-release campaign identified by SHA-256
+`4bdd5f6ec3f9dc6ff64e60d9515d02f44d26b4c1f4596180627d505903d13f82`. All 13 immutable
+public transfers and compare-and-swap head promotions completed. Independent live readback matches
+the exact authorized hashes in the ten-set catalogue, publication heads and authenticated approval
+records. The 19 official booklet choices now include 13 available `alpha_unverified` models; six
+unpublished choices remain unavailable. Distribution approval does not establish assembly correctness.
+
+Application commit `88e27ea6540c3f581a80cdb059260d80b0a20604` passed fresh GitHub CI
+(470 backend tests, 2 cache-dependent skips, 48 frontend tests, 17 software browser cases). Local
+checks passed 472 backend and 48 frontend tests; the full serial browser suite passed 36 cases with
+3 optional performance audits skipped. Focused alpha cases passed again after final label/parser
+changes. Cloud Build `92334e1c-cf2e-4ce6-8d36-93d3b682323f` succeeded; production revision
+`guide2build-web-00008-vof` serves 100% traffic with service maximum 1 instance and unchanged minimum 0.
+
+Real production Chromium 153.0.8010.12 checked every public release's first and final geometry view
+(26 views), exact manifest hash, alpha labels, disclosed review state, component count and official
+booklet/page link. Desktop 1440×1000 and plane/final Rivendell phone 390×844 checks passed. Observed
+application/JavaScript errors, HTTP error responses and application warnings were zero. Four Chromium
+GPU pixel-readback warnings are retained separately; the earlier warning-sensitive failure remains
+in the evidence. No private source/review APIs or PDF/crop resources were fetched. Private-route
+404 and unauthenticated private preview 403 checks passed. Root inspected representative actual
+production desktop and phone captures; large-scene coarse placements and seating gaps remain visible.
+
+Live Rivendell booklet 3 first geometry readiness took 53.6 seconds from release lookup; combined
+first/final and phone inspection took 73.7 seconds. These are single browser QA observations, not
+GPU/network benchmarks. Safari, real touch devices, assembly acceptance and physical builds were not run.
+
+Exact frozen scenes, source pins, original render bindings and all 17 engine-job rows are unchanged.
+Assets contain verified individual-part geometry closure and original notices; no complete community
+assemblies, PDFs/crops, prompts, private completion reports, credentials or engine jobs were exported.
+The reviewed-tutorial gates remain strict; these are separately labelled PDF-assisted unverified alpha
+releases. Their reported coverage does not constitute independently verified reconstruction accuracy.
+
+Temporary verification tags and the owned 4186 inspection server were removed without deleting assets
+or rollback revisions. The requested 4175 local preview remains available. Final ledger and browser
+diagnostic changes are excluded from the application build context; the deployed application still
+matches `88e27ea`. No further deployment, inference or pose changes were needed for this checkpoint.
+
+See [the exact release report](ALPHA_PRODUCTION_RELEASE.md). Evidence is retained under
+`var/evidence/alpha-production/`: `publication-receipts.json`, `final-state.json`,
+`live-service-final.json`, `production-model-browser/report.json`,
+`production-alpha-portal-browser/report.json`, `engine-preserved.json` and `service-cleanup.json`.

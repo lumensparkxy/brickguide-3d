@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "stage": "alpha_models_prepared_and_privately_staged",
-  "active_milestone": "publish_retained_alpha_models",
+  "stage": "alpha_models_published_and_production_verified",
+  "active_milestone": "alpha_production_release_complete",
   "web_app_test_followup": {
     "status": "passed",
     "portal_url": "http://127.0.0.1:4175/",
@@ -72,7 +72,7 @@
   "human_review_status": "not_run",
   "physical_build_status": "not_run",
   "github_issue_mapping": {},
-  "next_action": "Push/deploy the tested alpha-capable code, then obtain approval of the13 exact hashes in ALPHA_PRODUCTION_RELEASE.md and publish them. Reconstruction accuracy remains unverified.",
+  "next_action": "Finish authorized per-hash publication, then verify all13 models on the production URL. Accuracy improvement remains the next separate iteration.",
   "evidence_report": "docs/execution/VALIDATION_REPORT.md",
   "source_pages": 8,
   "toolchain": {
@@ -912,7 +912,7 @@
     "evidence": "var/evidence/home-set-dropdown/"
   },
   "alpha_production_release": {
-    "status": "prepared_verified_and_privately_staged_pending_exact_hash_approval",
+    "status": "complete_13_published_unverified_alpha_releases",
     "report": "docs/execution/ALPHA_PRODUCTION_RELEASE.md",
     "campaign_sha256": "4bdd5f6ec3f9dc6ff64e60d9515d02f44d26b4c1f4596180627d505903d13f82",
     "booklets": 13,
@@ -926,10 +926,65 @@
     "browser_tests_passed": 36,
     "browser_tests_skipped": 3,
     "actual_first_final_snapshot_views": 26,
-    "public_model_publication": "pending_exact_hash_user_approval",
+    "public_model_publication": "complete_13_exact_approved_hashes",
     "evidence": "var/evidence/alpha-production/release-index.json",
     "independent_security_review": "passed_software_and_actual_export_gates_only",
     "hashes_after_tightened_gates": "unchanged",
-    "private_staging": "complete_remote_bytes_and_generations_verified"
+    "private_staging": "complete_remote_bytes_and_generations_verified",
+    "code_release": {
+      "commit": "88e27ea6540c3f581a80cdb059260d80b0a20604",
+      "ci_run": "https://github.com/lumensparkxy/brickguide-3d/actions/runs/37184818332",
+      "ci_status": "success",
+      "cloud_build": "92334e1c-cf2e-4ce6-8d36-93d3b682323f",
+      "image_digest": "sha256:bc2569f37b8f73e35959f003345dcef5023d8d8380cc4dfcba20db82320229a6",
+      "public_revision": "guide2build-web-00008-vof",
+      "public_traffic_percent": 100,
+      "portal_browser": "passed",
+      "evidence": "var/evidence/alpha-production/live-service-final.json"
+    },
+    "engine_jobs_unchanged": 17,
+    "user_publication_authorization": {
+      "campaign_sha256": "4bdd5f6ec3f9dc6ff64e60d9515d02f44d26b4c1f4596180627d505903d13f82",
+      "answer": "Publish these 13 alpha releases",
+      "evidence": "var/evidence/alpha-production/authorization.json"
+    },
+    "fresh_ci": {
+      "backend_passed": 470,
+      "backend_skipped": 2,
+      "frontend_passed": 48,
+      "software_browser_passed": 17
+    },
+    "published_booklets": 13,
+    "official_booklet_choices": 19,
+    "publication_receipts": "var/evidence/alpha-production/publication-receipts.json",
+    "live_catalogue_heads_and_approvals": "var/evidence/alpha-production/final-state.json",
+    "production_browser": {
+      "status": "passed_all_13_exact_public_releases",
+      "first_final_snapshot_views": 26,
+      "phone_views": 2,
+      "desktop_viewport": [
+        1440,
+        1000
+      ],
+      "phone_viewport": [
+        390,
+        844
+      ],
+      "javascript_console_errors": 0,
+      "http_error_responses": 0,
+      "application_warnings": 0,
+      "chromium_gpu_pixel_readback_warnings": 4,
+      "private_source_or_review_fetches": 0,
+      "browser": "153.0.8010.12",
+      "largest_booklet_first_ready_seconds": 53.6,
+      "largest_booklet_lookup_first_final_phone_seconds": 73.7,
+      "timing_scope": "observed_browser_QA_not_GPU_or_network_benchmark",
+      "evidence": "var/evidence/alpha-production/production-model-browser/report.json",
+      "assembly_acceptance": "not_run_agent_software_and_visual_inspection_only"
+    },
+    "temporary_verification_tags": "removed_rollback_revisions_retained",
+    "temporary_inspection_server": "4186_stopped_no_data_deleted",
+    "requested_local_engine_preview": "4175_available",
+    "remaining": "None for the approved publication and production software checks. Reconstruction accuracy remains unverified; human assembly review and physical build are not run."
   }
 }

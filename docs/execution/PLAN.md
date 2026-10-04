@@ -516,3 +516,20 @@ and complete code/bundle/browser/staging checks before any required exact-hash a
 After authorization for those immutable hashes, publish assets/heads and verify the real production
 plane plus all13 booklet openings and representative large/mobile flows. Record any real blocker;
 never mark publication permission as human assembly acceptance or alpha as automatic accuracy success.
+
+Publication checkpoint: the user approved campaign SHA-256
+`4bdd5f6ec3f9dc6ff64e60d9515d02f44d26b4c1f4596180627d505903d13f82` and all 13
+immutable transfers and catalogue head promotions completed. Application commit `88e27ea6540c`
+passed fresh GitHub CI and public revision `guide2build-web-00008-vof` serves 100% traffic.
+Verify first and final snapshots for all 13 public releases, exact live heads and approval records,
+phone plane/Rivendell views and retained source/privacy boundaries before marking this request complete.
+Keep the existing 4175 local engine preview available for the next accuracy iteration.
+
+Completion checkpoint: all 13 live first/final viewer checks (26 views) and two phone views passed
+against exact immutable hashes; no application/HTTP errors, private source fetches or application
+warnings occurred. Four Chromium pixel-readback GPU warnings remain recorded. Production exposes
+13 alpha models among 19 official booklet choices; exact live catalogue/approval/head records match.
+Temporary verification tags and the owned 4186 inspection server are removed, with rollback revisions,
+all frozen data and the requested 4175 preview retained. Save the evidence ledger and push its final
+documentation/verification-tool checkpoint; application inputs still match deployed commit `88e27ea`.
+Accuracy, human assembly review and physical build remain unverified or not run.

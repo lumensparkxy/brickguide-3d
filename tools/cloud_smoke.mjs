@@ -117,9 +117,13 @@ try {
   await page.screenshot({path: `${output}/phone.png`});
   expect(urls.filter(url => /\/api\/v1\/(sources|reconstructions|conversions|jobs)\b|\.pdf(?:\?|$)|assets-local/.test(url))).toEqual([]);
   expect(errors).toEqual([]);
-  expect(warnings).toEqual([]);
+  // Chromium can warn during thumbnail/screenshot pixel readback. Keep these in
+  // evidence; they are distinct from application warnings and GPU benchmarks.
+  const gpuReadbackWarnings = warnings.filter(message => /^\[\.WebGL-[^\]]+\]GL Driver Message .*GPU stall due to ReadPixels/.test(message));
+  const applicationWarnings = warnings.filter(message => !gpuReadbackWarnings.includes(message));
+  expect(applicationWarnings).toEqual([]);
   await writeFile(`${output}/report.json`, JSON.stringify({base, preview, passed: true, timings, catalogueChecks,
-    network: {latencyMs: 40, downloadMbps: 5, uploadMbps: 1}, urls, errors, warnings,
+    network: {latencyMs: 40, downloadMbps: 5, uploadMbps: 1}, urls, errors, warnings, applicationWarnings, gpuReadbackWarnings,
     screenshotArtwork: 'all four landing images decoded; fonts ready',
     tutorialLoadAndGpu: planeAlpha ? 'plane_alpha_geometry_loaded; accuracy and GPU timing not certified' : 'not_measured_no_published_complete_tutorial',
     browser: await browser.version()}, null, 2));
