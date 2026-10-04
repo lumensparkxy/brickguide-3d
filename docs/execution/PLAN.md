@@ -485,3 +485,14 @@ copy that explicit file before Vite builds. Adapt the existing live cloud smoke 
 native dropdown, compare all ten labels with the catalogue/API, and use real supported sets for UI
 checks. Unsupported-set verification stays a read-only lookup. Verify the actual Cloud Build result
 and production page before recording release completion.
+
+Release complete: private GitHub code commit `d2b45cd9ef9c1c27d138c603fc643be79ecd993c` passed fresh CI;
+Cloud Build `31d81269-2919-46c9-a61d-3803635dba6b` succeeded. Public revision
+`guide2build-web-00006-voz` serves100% traffic and passed actual desktop/mobile browser checks.
+All10 catalogue option/API identities and19 official booklet entries match; no tutorials are published.
+Private preview returns403 without authentication and private API probes return404. The initial desktop
+capture preceded image readiness; retain it, wait for all four landing images/fonts, and inspect the final
+loaded captures. Final page/console errors and warnings are0. Save release receipts and push this final
+documentation/diagnostic checkpoint; no further application deployment is needed for that checkpoint.
+The13 unverified alpha candidate booklets remain available at the user's4175 local preview. Next work
+is reconstruction accuracy; no new inference, human acceptance or physical verification was performed.

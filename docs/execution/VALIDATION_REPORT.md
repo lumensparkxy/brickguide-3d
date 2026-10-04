@@ -937,3 +937,35 @@ stage; that dependency is now included. The existing live cloud smoke script use
 compares ten labels/API identities and uses real supported sets for desktop/mobile UI checks. Unknown
 set verification is a read-only API lookup. Deployment-safety regressions6 passed, script syntax and
 whitespace checks passed; actual Cloud Build/production verification remains pending at this checkpoint.
+
+Final release verification completed on4 October2026. Code commit
+`d2b45cd9ef9c1c27d138c603fc643be79ecd993c` passed fresh GitHub [run37181678182](https://github.com/lumensparkxy/brickguide-3d/actions/runs/37181678182):
+398 backend tests,2 explicitly skipped real-cache geometry comparisons,45 frontend tests and14 software
+browser cases. Logs are `github-ci-d2b45cd.log`. The deployment reran local software checks successfully.
+Actual Cloud Build `31d81269-2919-46c9-a61d-3803635dba6b` succeeded and returned immutable digest
+`sha256:568a31fe6125b3eb94fae4be2a224440575faeb52e0f344191b6dd523241235b`.
+Authenticated preview, tagged public revision and final public HTTP smoke checks all passed.
+
+[Production](https://guide2build-web-i2tso5lznq-ew.a.run.app) serves revision
+`guide2build-web-00006-voz` at100% traffic; the previous traffic receipt is retained for rollback.
+Actual Chromium153.0.8010.12 desktop1440x1000 and mobile390x844 checks passed. All10 option labels and
+API identities/19 configured official booklet entries match the source catalogue. Real plane and kart
+lookups/request confirmation, duplicate request handling, unknown-set GET, mobile no-overflow and six
+private-route404 probes passed. The private cloud preview returns403 without authentication. Browser
+page/console errors and warnings are0. Controlled40ms/5Mbps conditions measured interactive portal
+readiness at1071ms cold/36ms warm; this is not a tutorial load, image-ready or GPU performance measure.
+
+The first desktop screenshot preceded artwork decoding. It remains as
+`production-desktop-initial-capture.png`; the smoke script now waits for all four images and fonts before
+capturing full pages. Root inspected the final loaded desktop/mobile images and confirmed the labelled
+dropdown, expected art and removal of the home sample-button block. Actual evidence under
+`var/evidence/home-set-dropdown/`: `production-build.json`, `production-release.json`,
+`production-live-service.json`, `cloud-deploy.log`, `production-browser.json`,
+`production-desktop.png`, `production-mobile.png` and `production-booklets.png`.
+
+The final documentation/screenshot-readiness checkpoint does not change application/container inputs;
+the deployed code remains the tested `d2b45cd` image. The private GitHub repository contains the code
+checkpoint; the13 source-assisted alpha booklets stay in the running4175 loopback preview. Production
+reports no available tutorials for these ten sets; no alpha content, PDF crops or reconstruction engine
+is exposed. Reconstruction accuracy, human review and physical-build status remain unchanged/unverified.
+Safari and real touch-device checks were not run. No new provider inference or source/scene edits occurred.

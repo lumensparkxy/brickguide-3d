@@ -12,11 +12,25 @@ await mkdir(output, {recursive: true});
 const browser = await chromium.launch();
 const context = await browser.newContext({viewport: {width: 1440, height: 1000}});
 const page = await context.newPage();
-const errors = [], urls = [], timings = [];
+const errors = [], warnings = [], urls = [], timings = [];
 const catalogue = JSON.parse(await readFile(new URL('../config/sets.json', import.meta.url), 'utf8')).sets;
 const catalogueChecks = [];
 page.on('pageerror', error => errors.push(error.message));
+page.on('console', message => {
+  if (message.type() === 'error') errors.push(message.text());
+  if (message.type() === 'warning') warnings.push(message.text());
+});
 page.on('request', request => urls.push(request.url()));
+async function waitForArtwork() {
+  await page.locator('#how-it-works').scrollIntoViewIfNeeded();
+  await expect.poll(() => page.locator('img').evaluateAll(images =>
+    images.length === 4 && images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(Array.from(document.images, image => image.decode()));
+    window.scrollTo(0, 0);
+  });
+}
 try {
   const config = await context.request.get(`${base}/api/v1/config`);
   expect(config.status()).toBe(200);
@@ -55,6 +69,7 @@ try {
     catalogueChecks.push({set_number: value.set_number, name: value.name,
       guides: value.guides.map(guide => ({guide_id: guide.guide_id, tutorial_available: guide.tutorial_available}))});
   }
+  await waitForArtwork();
   await page.screenshot({path: `${output}/desktop.png`, fullPage: true});
   await selector.selectOption('30669');
   const recorded = page.waitForResponse(r => r.url() === `${base}/api/v1/requests` && r.request().method() === 'POST');
@@ -72,6 +87,7 @@ try {
   await page.getByRole('button', {name: 'Close booklet selection'}).click();
   await page.setViewportSize({width: 390, height: 844});
   await selector.selectOption('10316');
+  await waitForArtwork();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({path: `${output}/phone-home.png`, fullPage: true});
   await selector.selectOption('60400');
@@ -86,8 +102,10 @@ try {
   await page.screenshot({path: `${output}/phone.png`});
   expect(urls.filter(url => /\/api\/v1\/(sources|reconstructions|conversions|jobs)\b|\.pdf(?:\?|$)|assets-local/.test(url))).toEqual([]);
   expect(errors).toEqual([]);
+  expect(warnings).toEqual([]);
   await writeFile(`${output}/report.json`, JSON.stringify({base, preview, passed: true, timings, catalogueChecks,
-    network: {latencyMs: 40, downloadMbps: 5, uploadMbps: 1}, urls, errors,
+    network: {latencyMs: 40, downloadMbps: 5, uploadMbps: 1}, urls, errors, warnings,
+    screenshotArtwork: 'all four landing images decoded; fonts ready',
     tutorialLoadAndGpu: 'not_measured_no_published_complete_tutorial',
     browser: await browser.version()}, null, 2));
   console.log(JSON.stringify({passed: true, base, output, timings: timings.map(({state, portalReadyMs}) => ({state, portalReadyMs}))}));
