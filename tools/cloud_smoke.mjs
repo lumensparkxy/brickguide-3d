@@ -1,6 +1,6 @@
 // Actual public deployment checks. Never creates or approves tutorial releases.
 import {chromium, expect} from '@playwright/test';
-import {mkdir, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
 
 const base = process.argv[2];
 const preview = process.argv[3];
@@ -13,6 +13,8 @@ const browser = await chromium.launch();
 const context = await browser.newContext({viewport: {width: 1440, height: 1000}});
 const page = await context.newPage();
 const errors = [], urls = [], timings = [];
+const catalogue = JSON.parse(await readFile(new URL('../config/sets.json', import.meta.url), 'utf8')).sets;
+const catalogueChecks = [];
 page.on('pageerror', error => errors.push(error.message));
 page.on('request', request => urls.push(request.url()));
 try {
@@ -39,8 +41,22 @@ try {
     timings.push({state, portalReadyMs: performance.now() - start,
       navigation: await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.toJSON())});
   }
+  const selector = page.getByRole('combobox', {name: 'Your set number'});
+  expect(await selector.locator('option').allTextContents()).toEqual(
+    catalogue.map(set => `${set.set_number} - ${set.name}`));
+  await expect(page.getByRole('button', {name: /^Open set /})).toHaveCount(0);
+  for (const set of catalogue) {
+    const response = await context.request.get(`${base}/api/v1/sets/${set.set_number}`);
+    expect(response.status()).toBe(200);
+    const value = await response.json();
+    expect(value.set_number).toBe(set.set_number);
+    expect(value.name).toBe(set.name);
+    expect(value.guides.map(guide => guide.guide_id)).toEqual(set.guides.map(guide => guide.guide_id));
+    catalogueChecks.push({set_number: value.set_number, name: value.name,
+      guides: value.guides.map(guide => ({guide_id: guide.guide_id, tutorial_available: guide.tutorial_available}))});
+  }
   await page.screenshot({path: `${output}/desktop.png`, fullPage: true});
-  await page.getByLabel('Your set number').fill('30669');
+  await selector.selectOption('30669');
   const recorded = page.waitForResponse(r => r.url() === `${base}/api/v1/requests` && r.request().method() === 'POST');
   await page.getByRole('button', {name: 'Find my set', exact: true}).click();
   expect((await recorded).status()).toBe(202);
@@ -55,15 +71,22 @@ try {
   expect((await duplicate.json()).duplicate).toBe(true);
   await page.getByRole('button', {name: 'Close booklet selection'}).click();
   await page.setViewportSize({width: 390, height: 844});
-  await page.getByLabel('Your set number').fill('99998');
+  await selector.selectOption('10316');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path: `${output}/phone-home.png`, fullPage: true});
+  await selector.selectOption('60400');
   await page.getByRole('button', {name: 'Find my set', exact: true}).click();
   await expect(page.getByRole('status').filter({hasText: message})).toBeVisible();
-  await expect(page.getByRole('link', {name: 'View official instructions'})).toHaveCount(0);
+  await expect(page.getByRole('heading', {name: '60400 · Go-Karts and Race Drivers', exact: true})).toBeVisible();
+  await expect(page.getByRole('link', {name: 'View official instructions'})).toBeVisible();
+  const unknown = await context.request.get(`${base}/api/v1/sets/99998`);
+  expect(unknown.status()).toBe(200);
+  expect(await unknown.json()).toMatchObject({set_number: '99998', name: null, guides: []});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({path: `${output}/phone.png`});
   expect(urls.filter(url => /\/api\/v1\/(sources|reconstructions|conversions|jobs)\b|\.pdf(?:\?|$)|assets-local/.test(url))).toEqual([]);
   expect(errors).toEqual([]);
-  await writeFile(`${output}/report.json`, JSON.stringify({base, preview, passed: true, timings,
+  await writeFile(`${output}/report.json`, JSON.stringify({base, preview, passed: true, timings, catalogueChecks,
     network: {latencyMs: 40, downloadMbps: 5, uploadMbps: 1}, urls, errors,
     tutorialLoadAndGpu: 'not_measured_no_published_complete_tutorial',
     browser: await browser.version()}, null, 2));

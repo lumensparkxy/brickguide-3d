@@ -928,3 +928,12 @@ private `lumensparkxy/brickguide-3d` repository and website code only. Existing 
 13 `pdf_assisted_alpha_completion` candidates; they remain local, needs_review and unverified. Public
 alpha availability requires a separate release category/API, content-use resolution and exact-release
 user approval. No alpha tutorial has been published or marked human/physically verified.
+
+Private GitHub repository created and checkpoint `e90fdd2dc0d7f6c604d151b81d965028ca620663` pushed.
+Fresh Ubuntu/Python3.12/Node22 Actions [run37181459986](https://github.com/lumensparkxy/brickguide-3d/actions/runs/37181459986)
+passed dependency installation, software checks and the14 cache-independent browser cases.
+Container inspection found the new catalogue import must be explicitly copied into the frontend build
+stage; that dependency is now included. The existing live cloud smoke script uses native selection,
+compares ten labels/API identities and uses real supported sets for desktop/mobile UI checks. Unknown
+set verification is a read-only API lookup. Deployment-safety regressions6 passed, script syntax and
+whitespace checks passed; actual Cloud Build/production verification remains pending at this checkpoint.

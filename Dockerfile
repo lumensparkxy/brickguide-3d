@@ -7,6 +7,7 @@ COPY apps/web apps/web
 COPY packages/contracts packages/contracts
 COPY tests/fixtures/synthetic.scene.json tests/fixtures/synthetic.scene.json
 COPY config/placement-30669-alt-02-v3.json config/placement-30669-alt-02-v3.json
+COPY config/sets.json config/sets.json
 RUN npm run build
 
 FROM python:3.11-slim-bookworm AS runtime

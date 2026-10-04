@@ -846,7 +846,7 @@
   },
   "home_set_dropdown": {
     "date": "2026-10-04",
-    "status": "verified_release_prepared",
+    "status": "code_pushed_deployment_pending",
     "sets": 10,
     "option_format": "<set-number> - <catalogue name>",
     "homepage_sample_button_block": "removed",
@@ -873,8 +873,8 @@
     "screenshot_driver_readpixels_warnings": 4,
     "parallel_browser_failures": "Camera silhouette and review focus failed during parallel execution; both passed independently and complete serial suite passed without product camera/review edits.",
     "source_scene_engine_changes": "none; all17 persisted engine rows match the before-check hash",
-    "github": "Private lumensparkxy/brickguide-3d selected as stated default; creation/push pending",
-    "production": "Existing scoped cloud preflight passed; website code deployment pending. Alpha content publication is not performed.",
+    "github": "Private https://github.com/lumensparkxy/brickguide-3d created; e90fdd2dc0d7f6c604d151b81d965028ca620663 pushed and GitHub Actions run37181459986 passed on a fresh runner.",
+    "production": "Existing scoped cloud preflight passed; explicit build-stage catalogue dependency added and live smoke script adapted for dropdown/API labels. Website code deployment pending; alpha content publication is not performed.",
     "human_review": "not_run",
     "physical_build": "not_run",
     "evidence": "var/evidence/home-set-dropdown/"

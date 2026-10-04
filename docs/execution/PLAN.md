@@ -479,3 +479,9 @@ loading/recovery and source/geometry viewer checked. Source/scene data and all17
 Checkpoint the complete existing engine/source dependency closure plus dropdown and CI repairs; create
 the stated-default private GitHub repository, then use the existing code-only deployment command.
 Do not activate unverified alpha content or manufacture release approval.
+
+Container preflight found the new catalogue import needs `config/sets.json` in the frontend build stage;
+copy that explicit file before Vite builds. Adapt the existing live cloud smoke script to select the
+native dropdown, compare all ten labels with the catalogue/API, and use real supported sets for UI
+checks. Unsupported-set verification stays a read-only lookup. Verify the actual Cloud Build result
+and production page before recording release completion.
