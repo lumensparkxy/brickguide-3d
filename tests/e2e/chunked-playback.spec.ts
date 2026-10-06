@@ -61,6 +61,8 @@ async function openChunkedFixture(page:Page, storage=false, reducedMotion=true) 
 }
 
 test('fly-in on navigation and Replay moves pixels, settles exactly, repeats and respects reduced motion',async({page})=>{
+  // Serial WebGL pixel readbacks and viewport changes need headroom on software-rendered CI.
+  test.setTimeout(90_000);
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   const evidence='var/evidence/fly-in-20261006';await mkdir(evidence,{recursive:true});
   await page.setViewportSize({width:1440,height:900});
