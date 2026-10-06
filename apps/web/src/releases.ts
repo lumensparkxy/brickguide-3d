@@ -1,6 +1,7 @@
 import Ajv2020 from 'ajv/dist/2020';
 import schema from '../../../packages/contracts/scene.schema.json';
 import type { PartInstance, SceneManifest, StepSnapshot } from './contracts';
+import { modelAssetUrl } from './assets';
 
 export const REQUEST_RECORDED = 'This build isn’t ready yet. We’ve added it to our building list. Come back later to see what’s new!';
 export interface PortalConfig { mode: 'local' | 'public' | 'preview'; source_images: boolean; requests_enabled: boolean; }
@@ -11,11 +12,11 @@ export function parseConfig(value: unknown): PortalConfig {
 }
 interface Chunk { index:number; path:string; sha256:string; bytes:number; step_ids:string[]; }
 interface IndexedStep extends Omit<StepSnapshot,'poses'|'visible_instance_ids'|'active_instance_ids'|'snapshot_loaded'> { chunk_index:number; visible_instance_count:number; active_instance_count:number; }
-export interface AlphaReleaseMetadata {
-  artifact_kind: 'pdf_assisted_alpha_completion'; generation_mode: 'alpha_fast';
+export type AlphaReleaseMetadata = {
   source_coverage: string; coverage_text: string; uncertainty_notes: string[];
   accuracy: 'unverified'; human_review: 'not_run'; physical_build: 'not_run';
-}
+} & ({artifact_kind:'pdf_assisted_alpha_completion';generation_mode:'alpha_fast'}
+  | {artifact_kind:'exploration_candidate';generation_mode:'explore'});
 interface Release { scene:SceneManifest; chunks:Chunk[]; stepIndex:IndexedStep[]; assetBase:string; introducedAt:Record<string,number>; release_kind?:'unverified_alpha'; alpha?:AlphaReleaseMetadata; }
 const error = (message:string):never => {throw new Error(`Invalid tutorial release: ${message}`);};
 const hash = (value:unknown):value is string => typeof value==='string' && /^[a-f0-9]{64}$/.test(value);
@@ -37,7 +38,8 @@ function releaseMetadata(data:Record<string,any>):Pick<Release,'release_kind'|'a
   if(data.release_kind!=='unverified_alpha')error('release kind');
   const alpha=data.alpha as AlphaReleaseMetadata;
   const text=(value:unknown,max:number):value is string=>typeof value==='string'&&value.trim().length>0&&value.length<=max;
-  if(!alpha||alpha.artifact_kind!=='pdf_assisted_alpha_completion'||alpha.generation_mode!=='alpha_fast'
+  if(!alpha||!((alpha.artifact_kind==='pdf_assisted_alpha_completion'&&alpha.generation_mode==='alpha_fast')
+      ||(alpha.artifact_kind==='exploration_candidate'&&alpha.generation_mode==='explore'))
       ||alpha.accuracy!=='unverified'||alpha.human_review!=='not_run'||alpha.physical_build!=='not_run'
       ||!text(alpha.source_coverage,120)||!alpha.source_coverage.includes('unverified')||alpha.source_coverage.includes('independently_verified')
       ||!text(alpha.coverage_text,1000)||!alpha.coverage_text.startsWith('Reported coverage (unverified): ')
@@ -94,7 +96,7 @@ export class ReleaseLoader {
     const existing=this.cache.get(index);if(existing)return existing;
     const chunk=this.release.chunks[index];
     const task=(async()=>{
-      const response=await fetch(new URL(chunk.path,this.release.assetBase),{credentials:'omit'});
+      const response=await fetch(modelAssetUrl(new URL(chunk.path,this.release.assetBase)),{credentials:'omit'});
       if(!response.ok)throw new Error('This instruction could not be loaded. Please retry.');
       const length=response.headers.get('content-length');if(length&&Number(length)>chunk.bytes)error('chunk size mismatch');
       const reader=response.body?.getReader();if(!reader)error('empty chunk response');

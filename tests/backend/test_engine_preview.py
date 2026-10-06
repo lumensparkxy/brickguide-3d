@@ -1,6 +1,7 @@
 """Synthetic transport tests; these fixtures never prove real reconstruction accuracy."""
 import hashlib
 import json
+from copy import deepcopy
 
 import pytest
 from fastapi.testclient import TestClient
@@ -88,6 +89,59 @@ def test_status_without_candidate_and_no_mutation(preview):
     assert store.get(job['id']) == before
 
 
+def test_exploration_preview_keeps_unreconstructed_instructions_and_private_findings(preview):
+    client, store, job, directory, scene, frontend = preview
+    install_candidate(preview)
+    checkpoint = store.get(job['id'])['checkpoint']
+    checkpoint.update(processed_panels=3, reconstructed_panels=2, total_panels=12,
+                      model_calls_used=7, instruction_results=[
+        {'ordinal': 0, 'page_index': 1, 'panel': {'number': 1}, 'step_ids': ['s1'],
+         'reconstructed': True, 'checks_invalidated': True, 'findings': [{'category': 'source_view', 'description': 'Overview camera used.',
+          'private_path': '/private/provider/prompt.txt', 'instance_ids': ['a']}]},
+        {'ordinal': 1, 'page_index': 1, 'panel': {'number': 2}, 'step_ids': [],
+         'reconstructed': False, 'findings': [{'category': 'missing_geometry', 'description': 'No available real part.'}]},
+        {'ordinal': 2, 'page_index': 2, 'panel': {'number': 3}, 'step_ids': ['s2'],
+         'reconstructed': True, 'findings': []}])
+    with store.connect() as con:
+        con.execute('UPDATE engine_jobs SET config=?,checkpoint=? WHERE id=?',
+                    (json.dumps({'execution_policy': 'explore', 'max_model_calls': 100}),
+                     json.dumps(checkpoint), job['id']))
+    before = store.get(job['id'])
+    response = client.get('/api/v1/engine-preview')
+    state = response.json()
+    assert state['execution_policy'] == 'explore'
+    assert state['exploration']['processed_panels'] == 3
+    assert state['exploration']['reconstructed_panels'] == 2
+    assert state['exploration']['instructions'][1]['reconstructed'] is False
+    assert state['exploration']['instructions'][0]['findings'][0]['message'] == 'Overview camera used.'
+    assert state['exploration']['instructions'][0]['needs_recheck'] is True
+    assert state['exploration']['instructions'][1]['needs_recheck'] is False
+    assert '/private/provider' not in response.text
+    assert state['publication'] == 'not_performed'
+    assert store.get(job['id']) == before
+
+
+def test_exploration_preview_prioritizes_current_defect_and_groups_old_repeats():
+    from guide2build.engine.preview import exploration_status
+    findings = [{'code': 'aabb_overlap_candidate', 'severity': 'review', 'step_id': f'old-{index}',
+                 'instance_ids': ['a', 'b'], 'message': 'Bounds overlap; physical penetration is unknown.'}
+                for index in range(60)]
+    findings.append({'code': 'symmetric_coincident_geometry', 'severity': 'error', 'step_id': 'current',
+                     'instance_ids': ['left', 'right'], 'message': 'Whole-part geometry occupies the same placement.',
+                     'private_path': '/private/pinned/mesh.dat'})
+    checkpoint = {'instruction_results': [{'ordinal': 0, 'page_index': 1, 'step_ids': ['current'],
+                   'reconstructed': True, 'findings': findings}]}
+    before = deepcopy(checkpoint)
+    status = exploration_status({'execution_policy': 'explore'}, checkpoint)
+    instruction = status['instructions'][0]
+    assert instruction['finding_count'] == 61
+    assert len(instruction['findings']) == 2
+    assert instruction['findings'][0]['category'] == 'symmetric_coincident_geometry'
+    assert instruction['findings'][0]['instance_ids'] == ['left', 'right']
+    assert 'Recorded 60 times' in instruction['findings'][1]['message']
+    assert '/private/pinned' not in json.dumps(status) and checkpoint == before
+
+
 def test_alpha_preview_exposes_relaxed_errors_without_review_or_publication(preview):
     client, store, job, directory, scene, frontend = preview
     install_candidate(preview)
@@ -166,6 +220,33 @@ def test_warm_preview_rejects_changed_scene_and_source_pdf(preview):
     assert client.get('/api/v1/engine-preview').json()['candidate_available']
     (store.data_dir / 'sources/30669/alt-02/source.pdf').write_bytes(b'%PDF-changed-after-cache')
     assert not client.get('/api/v1/engine-preview').json()['candidate_available']
+
+
+def test_artifact_checkpoint_preview_keeps_scene_contract_and_detects_warm_tamper(preview):
+    client, store, job, directory, scene, frontend = preview
+    install_candidate(preview)
+    claimed = store.claim('artifact-preview', job_id=job['id'])
+    store.checkpoint(job['id'], 'artifact-preview', claimed['checkpoint'], 'paused')
+    assert client.get('/api/v1/engine-preview').json()['candidate_available']
+    manifest = client.get('/api/v1/sets/30669/guides/alt-02/release').json()
+    chunk = client.get(manifest['asset_base_url'] + manifest['chunks'][0]['path'])
+    assert chunk.status_code == 200
+    assert chunk.json()['steps'][0]['poses'] == scene.steps[0].model_dump(mode='json')['poses']
+    with store.connect() as con:
+        stored = json.loads(con.execute('SELECT checkpoint FROM engine_jobs WHERE id=?', (job['id'],)).fetchone()[0])
+    artifact = store.root / stored['candidate_artifact']['path']
+    original = artifact.read_bytes()
+    # Same byte count, no SQL update: warmed preview must recheck the artifact.
+    changed = original.replace(b'"schema_version":"2.0"', b'"schema_version":"2.1"', 1)
+    assert changed != original and len(changed) == len(original)
+    artifact.write_bytes(changed)
+    response = client.get('/api/v1/engine-preview')
+    assert response.status_code == 409 and response.json()['detail']['code'] == 'checkpoint_unavailable'
+    assert str(store.root) not in response.text
+    assert client.get('/api/v1/sets/30669/guides/alt-02/release').status_code == 409
+    assert (directory / 'scene.json').read_text() == json.dumps(scene.model_dump(mode='json'))
+    artifact.write_bytes(original)
+    assert client.get('/api/v1/engine-preview').json()['candidate_available']
 
 
 def test_source_pages_are_selected_committed_hash_verified_and_confined(preview):
@@ -396,6 +477,67 @@ def test_source_verification_cache_detects_same_size_changed_bytes(preview):
     pdf.write_bytes(data[:-1] + (b'X' if data[-1:] != b'X' else b'Y'))
     os.utime(pdf, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
     assert not client.get('/api/v1/engine-preview').json()['candidate_available']
+
+
+def test_exploration_poll_reuses_findings_but_refreshes_checkpoint_and_source(preview, monkeypatch):
+    from guide2build.engine import preview as preview_module
+    client, store, job, directory, scene, frontend = preview
+    install_candidate(preview)
+    checkpoint = store.get(job['id'])['checkpoint']
+    checkpoint.update(processed_panels=1, reconstructed_panels=1, instruction_results=[
+        {'ordinal': 0, 'page_index': 1, 'panel': {'number': 1}, 'step_ids': ['s1'],
+         'reconstructed': True, 'findings': [{'category': 'quality', 'description': 'Inspect seating.'}]}])
+    config = {'execution_policy': 'explore', 'max_model_calls': 100}
+    with store.connect() as con:
+        con.execute('UPDATE engine_jobs SET config=?,checkpoint=? WHERE id=?',
+                    (json.dumps(config), json.dumps(checkpoint), job['id']))
+    calls = []
+    original = preview_module.exploration_status
+
+    def counted(*args):
+        calls.append(True)
+        return original(*args)
+
+    monkeypatch.setattr(preview_module, 'exploration_status', counted)
+    before = store.get(job['id'])
+    first = client.get('/api/v1/engine-preview').json()
+    for _ in range(4):
+        assert client.get('/api/v1/engine-preview').json() == first
+    # A read-only SQLite connection may create/remove WAL sidecars on its first
+    # read. Once those identities settle, unchanged hot polls do no regrouping.
+    assert 1 <= len(calls) <= 2 and first['candidate_available']
+    warmed_calls = len(calls)
+    for _ in range(4):
+        assert client.get('/api/v1/engine-preview').json() == first
+    assert len(calls) == warmed_calls
+    assert store.get(job['id']) == before
+    checkpoint['instruction_results'][0]['findings'][0]['description'] = 'New source finding.'
+    with store.connect() as con:
+        # A real commit without an updated timestamp must invalidate the poll cache.
+        con.execute('UPDATE engine_jobs SET checkpoint=? WHERE id=?', (json.dumps(checkpoint), job['id']))
+    changed = client.get('/api/v1/engine-preview').json()
+    assert changed['exploration']['instructions'][0]['findings'][0]['message'] == 'New source finding.'
+    assert len(calls) > warmed_calls
+    client.get('/api/v1/engine-preview')
+    changed_calls = len(calls)
+    pdf = store.data_dir / 'sources/30669/alt-02/source.pdf'
+    pdf.write_bytes(b'%PDF-1.4 changed after findings cache')
+    assert not client.get('/api/v1/engine-preview').json()['candidate_available']
+    assert len(calls) == changed_calls
+
+
+def test_cached_exploration_projection_is_not_shared_with_consumers(preview):
+    from guide2build.engine.preview import _CandidatePreview
+    client, store, job, directory, scene, frontend = preview
+    selected = _CandidatePreview(store.data_dir, store.db, job['id'], {})
+    current = {'config': {'execution_policy': 'explore'}, 'checkpoint': {
+        'instruction_results': [{'ordinal': 0, 'step_ids': ['s1'], 'findings': [
+            {'category': 'quality', 'description': 'Retain this uncertainty.'}]}]}}
+    before = deepcopy(current)
+    projection = selected._exploration_status(current)
+    projection['instructions'][0]['findings'][0]['message'] = 'Changed by a consumer'
+    assert selected._exploration_status(current)['instructions'][0]['findings'][0]['message'] == 'Retain this uncertainty.'
+    assert current == before
 
 
 @pytest.mark.parametrize('filename', ['source.pdf', 'source.receipt.json'])

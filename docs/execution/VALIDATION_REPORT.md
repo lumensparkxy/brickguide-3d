@@ -1,6 +1,106 @@
-# Version I implementation and validation — 2 October 2026
+# Guide2Build implementation and validation
 
-## Latest local change — alpha image tolerance, 3 October 2026
+## Test-suite optimization — 4 October 2026
+
+Added an explicitly labelled quick development scope: **105 selected backend cases**, schema, Ruff,
+frontend type checking and all **52 frontend tests**. The first quick backend run passed in 3.31 seconds;
+independent final backend-only quick verification passed in 1.75 seconds. The no-flag command and
+unchanged CI still run the full regression and build; quick/browser combination is rejected before startup.
+
+Consolidated three identical setup workflows into one prompt-contract test while retaining every
+assertion, removed unused checkpoint snapshots, made needed recovery snapshots opt-in, and replaced
+durable source/geometry/job setup with equivalent in-memory inputs in six pure scoring and sixteen
+malformed-request tests. All distinct input variants remain. The frontend check now runs TypeScript once.
+
+Final full check passed **1,041 backend cases**, **52 frontend tests**, schema, Ruff, TypeScript and build.
+The baseline was 1,043 cases / 31.76 seconds; final full pytest reported 28.06 seconds. These are single
+observations of changed test setup, not a causal performance benchmark. Independent review verified
+case mapping, correction input equivalence, recovery snapshot consumers and full/quick command scope.
+
+All 40 pinned saved scenes/sources, all 24 live job rows and all 14 pinned engine/command files are
+unchanged. Local app ports remain closed. No inference, app/browser startup, publication or model/scene
+change occurred. This work reduces development-check overhead; tests do not run during generation or
+saved-model playback. See [TEST_SUITE_OPTIMIZATION.md](TEST_SUITE_OPTIMIZATION.md) and
+`var/evidence/test-suite-optimization-20261004/` for exact commands, JUnit, mappings, pins and limits.
+
+## Engine efficiency implementation — 4 October 2026
+
+Implemented actionable assembly repairs, exact packed model context, invocation-local diagnostic
+prefix reuse, immutable candidate checkpoint files and an explicit two-worker option for different
+sets. Instructions and same-set booklets remain ordered. Existing jobs retain their legacy policy;
+model/provider choices, saved SceneV2 data and production playback are unchanged.
+
+The final check passed **1,043 backend tests**, **52 frontend tests**, schema, Ruff, TypeScript and
+build. Independent review reproduced and resolved partial nested-group repair scope, unnecessary
+unnumbered-attachment repair and expired-owner cancellation. The real local runner with synthetic
+providers retains accepted checkpoints and consumed attempts after two-worker Ctrl-C/provider pause.
+No browser/server was started, preserving the user's stopped-local-app request.
+
+Final retained-trial measurements: assembly input 60,005 → 45,195 bytes (24.68% smaller), complete
+initial prompts 1,402,221 → 1,394,719 bytes (0.535% smaller), and local main-4 search median 0.9905 →
+0.8725 seconds (11.9% faster) with identical complete diagnostic/search output. Original synthetic
+checkpoint tests reduce SQLite row payload by over 99.8%; immutable candidate files remain separate,
+so this is not a total-disk-space claim. There were zero new provider calls. Full-booklet generation
+speed and new reconstruction accuracy are unmeasured. Human review and physical build remain
+`not_run`; no publication or production change occurred.
+
+See [ENGINE_EFFICIENCY.md](ENGINE_EFFICIENCY.md) and `var/evidence/engine-efficiency-20261004/` for
+exact measurements, fixed budgets, legacy compatibility, implementation pins and preservation
+checks. Dated reports below retain earlier outcomes; local web applications are currently stopped.
+
+## Historical generation and local overhead cleanup — 4 October 2026
+
+Retained search output is unchanged while local search time falls from about 2.09 to
+0.99 seconds; catalogue verifications fall from 107 to two. Warm saved-preview status
+computation falls from 220.67 to 1.25 ms with an identical canonical response. Fifteen
+historical JSON files retain their exact readable paths and hashes while saving
+1,073,291,264 allocated bytes through lossless transparent compression. Three obsolete
+previews and an idle worker were stopped; previews 4176 and 4179 remained available at this earlier
+checkpoint and were subsequently stopped at the user's request.
+
+All **912 backend tests**, schema, Ruff, whitespace checks and the focused browser
+regression pass. Actual saved-model browser inspection records zero JavaScript errors.
+All 161 checked saved-state files and all fifteen compression targets preserve their
+original byte hashes. No new inference, model accuracy measurement, human/physical review
+or publication occurred. See [OVERHEAD_CLEANUP.md](OVERHEAD_CLEANUP.md) and
+`var/evidence/overhead-cleanup-20261004/` for measured scope and limitations.
+
+## Complete-booklet accuracy iteration — 4 October 2026
+
+The new exploration policy, bounded alternatives, source comparisons, immutable correction
+forks and per-instruction preview findings are implemented. The source-only 30669 /
+alt-02 run completed all 13 indexed panels: 12 numbered main steps, 18 snapshots and
+32 pieces. One immutable assisted correction pass repairs both wing mounts, the first
+callout tile and two attachment-group labels. Fixed-camera main 3 silhouette overlap
+improves from 0.7583 to 0.9259; invalid grouping and unexplained-movement observations
+fall from two and three to zero. All 18 snapshots have source/before/after evidence and
+were exercised in the actual browser at desktop and phone sizes.
+
+The existing `gpt-6-astra` / high provider and shared 100-call ceiling stayed fixed:
+52 shared reservations, including the retained failed trial; correction added no engine
+provider calls. The frozen alpha remains a comparison input, not a generator input or
+independent truth. Current measurements and remaining work are in
+[`ACCURACY_ITERATION.md`](ACCURACY_ITERATION.md) and `PROGRESS.json`.
+
+The final integrated backend regression passed **637 tests** in 17.44 seconds, with no
+failures or skips. Ruff, schema and whitespace checks passed, including the later selection,
+segmentation, contact localization and interrupted-trial recovery fixes. Frontend typecheck, **52 tests**
+and build passed. Five exploration/viewer browser regressions passed, and the later
+inherited-findings labeling change passed its targeted backend and browser checks.
+Evidence is retained under `var/evidence/accuracy-30669-20261004/`.
+
+Source-only agent annotations cover all 12 main-instruction quantities (32 pieces),
+26 exact design identities and 22 colours, plus 10 qualitative visible relationships.
+Unannotated attributes, human review and physical verification are not inferred.
+The same qualitative rubric improves from eight pass / one fail / one unknown to nine /
+zero / one, matching the assisted alpha on this limited checklist. Eight localized nominal
+connector conflicts remain in the corrected final model. The tail's missing center-tube
+receiver was added from pinned individual geometry without changing its pose; nominal
+reachability is not a physical-build claim. No publication or production change was made.
+The dated entries below preserve earlier checkpoints; their former provider and gate
+limitations are not the current engine status.
+
+## Historical local change — alpha image tolerance, 3 October 2026
 
 Implemented opt-in `--quality-profile alpha` (8 px landmark RMS, 12 px point cap); the strict default stays
 4/12 px. Persisted job/receipt policy prevents changing tolerance during resume. Alpha camera fits retain
@@ -36,7 +136,7 @@ correctness. The complete booklet and broader geometry/connector checks remain o
 full-browser regression suites were not rerun for this small change; targeted Chromium UI checks were run.
 The pre-existing Starlette deprecation and frontend chunk-size warnings remain non-fatal.
 
-## Outcome
+## Historical prototype outcome — 2 October 2026
 
 A runnable local application now supports set lookup, official-source preparation, persistent assisted jobs,
 and an interactive, synchronized **PDF-assisted candidate** for all 12 printed main steps.
@@ -1014,3 +1114,120 @@ See [the exact release report](ALPHA_PRODUCTION_RELEASE.md). Evidence is retaine
 `var/evidence/alpha-production/`: `publication-receipts.json`, `final-state.json`,
 `live-service-final.json`, `production-model-browser/report.json`,
 `production-alpha-portal-browser/report.json`, `engine-preserved.json` and `service-cleanup.json`.
+
+## Production alpha opening: missing origin and cached CORS headers — 4 October 2026
+
+The user reported `Let’s try again / Failed to fetch` after `Open alpha model`.
+Actual in-app browser interaction reproduced it on
+`https://guide2build-web-989917723212.europe-west1.run.app/`; the same plane release
+opened on `https://guide2build-web-i2tso5lznq-ew.a.run.app/`. The earlier release
+verification used the latter address and did not cover the project-number alias.
+
+The public asset bucket allowed only the hashed public/preview origins. A real
+HEAD request for the plane's first chunk returned 200 without
+`Access-Control-Allow-Origin` for the project-number alias. The same request from
+the hashed alias returned its expected permission header. Cloud Run advertises
+both formats in `run.googleapis.com/urls`; the deployment tool previously used
+only `status.url` when configuring the asset bucket.
+
+The live bucket CORS configuration now includes all four actual public/preview
+origins, retaining GET/HEAD and the existing exposed headers. Bucket ownership was
+checked from raw Google metadata and the update was read back. The first repair
+attempt refused to mutate because formatted gcloud output omits the project
+number; the raw metadata correction preserves that ownership guard. No IAM,
+publication heads, model bytes or Cloud Run traffic were changed by this update.
+
+The original public asset URL still returns cached old headers with one-year
+immutable caching, so the failing browser tab still cannot open it. A stable
+`?g2b-transport=2` URL returns the corrected permission header for the exact same
+object generation. This matches Google's documented [cache consistency limits](https://docs.cloud.google.com/storage/docs/consistency#cache_control_and_consistency).
+The client repair adds that stable query only to the trusted public storage origin
+for chunks, provenance, materials and nested individual geometry. Existing byte
+counts, SHA-256 checks, dependency confinement and local URL behaviour remain.
+The deployment tool now obtains aliases and active verification tags from actual
+service metadata and applies their CORS configuration before smoke/traffic checks.
+
+| Check | Result and scope | Evidence under `var/evidence/alpha-fetch-repair/` |
+|---|---|---|
+| Real production reproduction | Failed on project-number alias; same plane opened on hashed alias | `production-error.png`, `cors-before.json` |
+| Live bucket correction | Applied and verified; original configuration retained | `bucket-raw-before.json`, `cors-apply-verified.log`; readback in `var/evidence/cloud-release/cors-readback.json` |
+| Cache diagnosis | Original URL still lacks permission header; versioned URL has it, same generation | `cors-after-headers.json`, `cache-version-probe.json` |
+| Local full checks | 490 backend tests, schema, Ruff, 48 then 51 frontend tests, typecheck and production build passed | `full-software-check.log`, `frontend-transport-check.log` |
+| Focused browser regression | Six cases passed, including a synthetic stale-CORS response and nested geometry dependency | `browser-transport-loopback.log` |
+| Actual public asset requests | 104 HEAD checks passed across 13 exact release hashes and both public aliases; plane first-chunk byte count/SHA verified | `all-release-cors-verification.json` |
+| Rebuilt real-data viewer | Plane first/final loaded, previous navigation worked, desktop 1440×900 and phone 390×844 inspected; captured console errors/warnings zero | `local-desktop-final.png`, `local-phone-final.png` |
+| Production client rollout | User approved; Cloud Build succeeded; revision `guide2build-web-00012-pej` serves 100% traffic | `deployment-authorization.json`, `cloud-build-final.json`, `services-final.json` |
+| Previously failing production URL | All 13 real published models opened; first/final instructions (26 desktop views) and two phone views passed against exact existing hashes; no application errors, HTTP failures or private source requests | `production-numeric-models/report.json` and its screenshots |
+| Both production aliases, direct browser inspection | Plane first/final instructions loaded, Replay enabled, final Next disabled; desktop 1440×900 and phone 390×844 rendered; captured console errors/warnings zero | `production-manual-browser.json`, `production-desktop-final.png`, `production-phone-final.png`, `production-alternate-final.png`, `production-alternate-phone.png` |
+| Privacy boundaries | Eight public private-route probes returned 404; unauthenticated private preview returned 403; authenticated deployment smoke passed | `privacy-probes.json`, `cloud-deploy.log` |
+| Verification cleanup | Removed only `verify-29c7afef9e7d`; four active service origins verified, same image/revision at 100% traffic; rollback revisions retained | `cleanup-readback.json`, `services-final.json`, `bucket-final.json` |
+
+Retained earlier failures include an initial local command-handler indentation
+error, a Playwright CLI argument error, and sandbox loopback bind restrictions.
+They were corrected before the passing checks above; logs are retained. The
+existing Three.js bundle-size advisory and TestClient deprecation warning remain.
+One direct-browser locator wait expired while the alternate alias was loading;
+subsequent accessibility and rendered observations showed ready geometry with no
+application errors. The all-model Chromium run recorded four GPU pixel-readback
+warnings separately, with zero application warnings.
+
+The HTTP probes verify CORS headers and release identities, not browser rendering
+or assembly correctness. The local actual model inspection and six synthetic
+software cases are separate evidence. All alpha accuracy/human/physical labels
+retain their prior unverified or `not_run` state. This repair performs no inference
+or reconstruction. The production incident is resolved after the approved rollout
+and live browser checks above. Application inputs are local commit
+`29c7afef9e7dac9d8a34fa6642520f3443c9ecb7`; Cloud Build
+`2063b640-0c63-41f5-8b65-9372502cd881` finished successfully at
+`2026-10-04T08:17:29.555838Z`, producing image digest
+`sha256:46012ade24c0b1431f9d07735699f6bd8abfe003f0953560b2626046d985cc70`.
+The private preview is revision `guide2build-preview-00004-64h`. Both services use
+the same verified image. The temporary 4186 inspection server was stopped. Final
+listener checks find neither 4186 nor the separate 4175 preview listening; this
+repair did not start or stop 4175, and its files remain (see
+`var/evidence/alpha-fetch-repair/final-listener-check.json`). No GitHub push, PR or
+merge was performed for this repair.
+# Accuracy improvement implementation — 4 October 2026
+
+Validation passed: 889 backend tests, 52 frontend tests, schema drift check, Ruff,
+typecheck/build and one focused Playwright preview regression. Actual inspection
+covered 12 Three.js alternative images and the saved 30669 model's findings preview.
+All 5,277 historical files in the initial preservation inventory remain unchanged.
+The same model and inference ceilings are retained; no new model calls or publication
+occurred. Feedback-size and receiver-coverage benefits are measured offline; fresh
+automatic reconstruction accuracy and runtime benefits remain unmeasured. Human
+review and physical build are `not_run`. See `ENGINE_ACCURACY_IMPROVEMENTS.md` and
+`var/evidence/engine-accuracy-improvements-20261004/` for evidence and limitations.
+
+
+## Current shuttle only: batch stopped incomplete — 5 October 2026
+
+The user-restricted31134/booklet-01 exploration pass is blocked at47/58 processed
+and reconstructed events, with110 parts and55 accepted snapshots through printed
+main44. The raw parent is preserved separately from the assisted source-schema
+recovery child. Its two new model calls finished (188 shared including186 inherited),
+then the engine exited naturally. The exact blocker is `Verified catalogue inputs
+changed during hypothesis search`; the error names no changed resource. One private
+45.006857-second audit timed out, leaving safe resume unproven. No further retry,
+set, booklet, correction or improvement cycle follows.
+
+The stopped child, source PDF/all60 checkpoint-bound PNGs, raw/corrected history,
+prompts, calls, trial failures, findings and logical database/checkpoint are retained.
+All338 child final-manifest entries verify; the partial evaluation is independently
+rehash-verified and its387 selected inputs are unchanged. One actual Three.js overview
+and official page48 show one correlated wrong-end thruster placement defect.
+Completed quantity rows match44/44; four unfinished mains account for34 pieces.
+Eleven indexed events remain unprocessed. Exact identity/colour/pose/connection and
+collision accuracy are unscored; repeated findings are not unique defect counts.
+Human review and physical build remain `not_run`; no publication occurred.
+
+All four campaign rows match the saved stop and have no owner/lease. Final scoped
+process inspection finds no task-owned engine, renderer or recovery helper.
+Previous model originals are untouched. Red-aeroplane and raw second-car exact
+backups verify, with separate readable recovery scene copies saved; their latest
+primary-path local read failures remain recorded without claiming fresh primary
+verification. The first-car and corrected second-car primary scenes verify.
+
+Full locations, remaining issues, hashes, preservation limits and shutdown evidence:
+`var/evidence/next-nine-20261005/STOPPED_RUN_REPORT.md`. This records a preserved,
+inspectable partial result and a clean stop, not complete-booklet success.

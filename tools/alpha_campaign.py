@@ -16,7 +16,8 @@ from guide2build.catalog import find_guide
 from guide2build.engine.alpha import AlphaSourceReview, accept_alpha_correction
 from guide2build.engine.alpha_runner import ALPHA_PIPELINE, AlphaRuntimeChoice, alpha_runtime_choice, run_alpha_claimed
 from guide2build.engine.geometry import verify_individual_assets
-from guide2build.engine.runner import Heartbeat, atomic_json, run_once
+from guide2build.engine.runner import Heartbeat, atomic_json
+from guide2build.engine.scheduling import run_queue_wave
 from guide2build.engine.store import EngineStore, LeaseLost
 from guide2build.jobs.source_cache import cached_receipt
 from guide2build.releases.models import SceneV2, digest
@@ -379,16 +380,27 @@ def set_alpha_runtime(store, job, model, reasoning, reason):
         raise
 
 
-def summary(store, manifest):
+def summary(store, manifest, *, cache=None):
+    # This optional cache belongs only to the current command. Final handoff
+    # calls omit it and hydrate/hash every candidate again. Live progress avoids
+    # rereading all unchanged large scenes whenever another set saves a batch.
+    metadata = {row["id"]: row for row in store.queue_snapshot(manifest["job_ids"])} if cache is not None else {}
     result = []
     for identity in manifest["job_ids"]:
+        row = metadata.get(identity)
+        cache_key = None if row is None else (row["updated"], row["state"], row["cancel"],
+            row["alpha_source_complete"], row["alpha_completed_pages"], row["completed_panels"],
+            json.dumps(row["error"], sort_keys=True))
+        if cache is not None and identity in cache and cache[identity][0] == cache_key:
+            result.append(dict(cache[identity][1]))
+            continue
         job = store.get(identity)
         cp = job["checkpoint"]
         scene = cp.get("candidate") or {}
         main_count = len({(step["section_id"], step["main_step_number"])
             for step in scene.get("steps", []) if step["main_step_number"] is not None
             and step["source"]["source_sha256"] == cp.get("source_sha256")})
-        result.append({"job_id": identity, "set_number": job["set_number"], "guide_id": job["guide_id"],
+        item = {"job_id": identity, "set_number": job["set_number"], "guide_id": job["guide_id"],
             "state": job["state"], "stage": cp.get("stage", "queued"),
             "completed_pages": cp.get("alpha_completed_pages", cp.get("completed_pages", 0)),
             "page_count": cp.get("page_count"), "main_steps": main_count,
@@ -397,10 +409,45 @@ def summary(store, manifest):
             "artifact_kind": cp.get("artifact_kind", job["config"].get("artifact_kind", "automatic_approximate_alpha")),
             "source_coverage": cp.get("source_coverage", "not_started"),
             "runtime_choice": alpha_runtime_choice(job["config"], cp),
-            "source_sha256": cp.get("source_sha256"), "scene_sha256": digest(scene) if scene else None})
+            "source_sha256": cp.get("source_sha256"), "scene_sha256": digest(scene) if scene else None}
+        result.append(item)
+        # A worker may have saved between the lightweight snapshot and hydration.
+        # Its updated value must agree before this summary can be reused.
+        if cache is not None and job["updated"] == row["updated"]:
+            cache[identity] = cache_key, dict(item)
     return {"recorded_at": datetime.now(timezone.utc).isoformat(), "selected_sets": 10, "selected_booklets": 13,
         "provider_pause": store.provider_pause(), "jobs": result, "human_review": "not_run", "physical_build": "not_run",
         "publication": "not_performed"}
+
+
+def run_campaign_round(store, manifest, *, workers=1, skip_sets=(), on_result=None, run_job=None):
+    """One bounded source-batch per selected job, without crossing set dependencies."""
+    rows = {job["id"]: job for job in store.queue_snapshot(manifest["job_ids"])}
+    selected = []
+    for identity in manifest["job_ids"]:
+        job = rows[identity]
+        if job["set_number"] in skip_sets or job["alpha_source_complete"]:
+            continue
+        if job["state"] in {"failed", "cancelled", "awaiting_approval"} or job["cancel"]:
+            continue
+        # These official booklets continue the same physical assembly. A later
+        # booklet is not an independent set and cannot run ahead of its prefix.
+        if job["set_number"] == "10316" and job["guide_id"] in {"booklet-02", "booklet-03"}:
+            predecessor = "booklet-01" if job["guide_id"] == "booklet-02" else "booklet-02"
+            if not any(prior["set_number"] == job["set_number"] and prior["guide_id"] == predecessor
+                       and prior["alpha_source_complete"] and not prior["owner"] for prior in rows.values()):
+                continue
+        if job["state"] == "blocked":
+            if (job["error"] or {}).get("code") != "alpha_predecessor_required":
+                continue
+            store.retry(identity)
+        selected.append(identity)
+    wave = run_queue_wave(store, job_ids=selected, workers=workers, max_panels=1,
+                          on_result=on_result, run_job=run_job)
+    latest = {job["id"]: job for job in store.queue_snapshot(selected)}
+    wave["progressed"] = any(latest[identity]["alpha_completed_pages"] > rows[identity]["alpha_completed_pages"]
+                             for identity in selected)
+    return wave
 
 
 def main():
@@ -414,6 +461,8 @@ def main():
     run = sub.add_parser("run")
     run.add_argument("--max-rounds", type=int, default=0, help="0 continues selected source jobs until complete or blocked")
     run.add_argument("--skip-set", action="append", default=[], help="Temporarily skip a set being completed by an assisted author")
+    run.add_argument("--workers", type=int, choices=(1, 2), default=1,
+                     help="Explicit concurrency for independent sets; booklets of one set stay sequential")
     sub.add_parser("status")
     registration = sub.add_parser("register-assisted")
     registration.add_argument("--set", dest="set_number", required=True)
@@ -476,35 +525,20 @@ def main():
         if args.max_rounds < 0:
             raise ValueError("Round ceiling cannot be negative")
         round_number = 0
+        summary_cache = {}
         while not store.provider_pause():
-            progressed = False
-            for identity in manifest["job_ids"]:
-                job = store.get(identity)
-                if job["set_number"] in args.skip_set:
-                    continue
-                cp = job["checkpoint"]
-                if cp.get("alpha_source_complete") or job["state"] in {"failed", "cancelled", "awaiting_approval"}:
-                    continue
-                if job["state"] == "blocked":
-                    if (job["error"] or {}).get("code") != "alpha_predecessor_required":
-                        continue
-                    prior = "booklet-01" if job["guide_id"] == "booklet-02" else "booklet-02"
-                    if not any(store.get(j)["guide_id"] == prior and store.get(j)["set_number"] == "10316"
-                               and store.get(j)["checkpoint"].get("alpha_source_complete") for j in manifest["job_ids"]):
-                        continue
-                    store.retry(identity)
-                before = cp.get("alpha_completed_pages", 0)
-                processed = run_once(store, job_id=identity, max_panels=1)
-                latest = store.get(identity)
-                progressed |= processed and latest["checkpoint"].get("alpha_completed_pages", 0) > before
-                print(json.dumps({"job_id": identity, "set": latest["set_number"], "guide": latest["guide_id"],
-                    "state": latest["state"], "pages": latest["checkpoint"].get("alpha_completed_pages", 0),
-                    "mains": latest["checkpoint"].get("completed_panels", 0), "error": latest["error"]}), flush=True)
-                atomic_json(args.campaign_file.parent / "status.json", summary(store, manifest))
-                if store.provider_pause():
-                    break
+
+            def report_result(result):
+                latest = store.queue_snapshot([result["job_id"]])[0]
+                print(json.dumps({"job_id": latest["id"], "set": latest["set_number"], "guide": latest["guide_id"],
+                    "state": latest["state"], "pages": latest["alpha_completed_pages"],
+                    "mains": latest["completed_panels"], "error": latest["error"]}), flush=True)
+                atomic_json(args.campaign_file.parent / "status.json", summary(store, manifest, cache=summary_cache))
+
+            wave = run_campaign_round(store, manifest, workers=args.workers, skip_sets=args.skip_set,
+                                      on_result=report_result)
             round_number += 1
-            if not progressed or (args.max_rounds and round_number >= args.max_rounds):
+            if not wave["progressed"] or (args.max_rounds and round_number >= args.max_rounds):
                 break
             time.sleep(0.1)
     report = summary(store, manifest)

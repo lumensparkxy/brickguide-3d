@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "scope": "Eighteen individual part designs plus the official 3023-to-3023b alias. Explicit conventional stud/socket frames only, including the real centre stud of 15573. Nominal local mating frames derived from pinned geometry; not independently measured clutch tolerances or physical-build evidence. No set placements or assembly sequence are stored.",
+  "scope": "Eighteen individual part designs plus the official 3023-to-3023b alias. Explicit stud/socket frames only, including the real centre stud of 15573 and the individually inspected centre-tube receiver of 18980. Nominal local mating frames derived from pinned geometry; not independently measured clutch tolerances or physical-build evidence. No set placements or assembly sequence are stored.",
   "metadata_status": "agent_derived_needs_independent_review",
   "tolerance_ldu": 0.05,
   "parts": [
@@ -3219,10 +3219,42 @@
             2,
             3
           ]
+        },
+        {
+          "connector_id": "socket:0:-8:0",
+          "kind": "socket",
+          "position_ldu": [
+            0,
+            -8,
+            0
+          ],
+          "normal": [
+            0,
+            -1,
+            0
+          ],
+          "tangent": [
+            1,
+            0,
+            0
+          ],
+          "engagement_ldu": 4,
+          "allowed_quarter_turns": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "support_basis": "Individually inspected open centre stud4.dat tube; nominal cylindrical receiver only, not an automatically inferred primitive rule."
         }
       ],
       "evidence": [
-        "Root stug-1x4.dat at raw z=-10 and stug-1x6.dat at raw z=10 establish ten external top axes. Raw y=8 rim polygons, y=4 inner cover, and the four transformed s/7904s01.dat rounded-corner rims establish the ten corresponding nominal underside positions. Removed corner cells (raw x=+/-50,z=-10) have no connectors. Internal stug4-1x5.dat tubes are not stud/socket axes."
+        "Root stug-1x4.dat at raw z=-10 and stug-1x6.dat at raw z=10 establish ten external top axes. Raw y=8 rim polygons, y=4 inner cover, and the four transformed s/7904s01.dat rounded-corner rims establish the ten corresponding nominal underside positions. Removed corner cells (raw x=+/-50,z=-10) have no connectors.",
+        "The separately inspected central receiver follows root stug4-1x5.dat at raw [0,4,0] with diag(1,-1,1), then its identity-transformed central stud4.dat. The pinned stud4.dat inner cylinder has radius 6 and raw y=-4..0, giving root raw y=8..4 and canonical y=-8..-4. Its open mouth at canonical [0,-8,0] accepts the nominal radius-6, height-4 stud cylinder without changing the part origin. Only this centre tube is added as an explicit receiver."
+      ],
+      "limitations": [
+        "The other four tube axes at raw x=-40,-20,20,40 remain unsupported; this record is not a general rule turning internal tube primitives into sockets.",
+        "Nominal coaxial diameter, depth and seating do not establish real tolerances, clutch force, strength or a physical build. The receiving tube is not a visible source landmark."
       ]
     },
     {

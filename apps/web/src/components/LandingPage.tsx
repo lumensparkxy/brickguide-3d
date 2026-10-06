@@ -1,4 +1,4 @@
-import { IconArrowRight } from '@tabler/icons-react';
+import IconArrowRight from '@tabler/icons-react/dist/esm/icons/IconArrowRight.mjs';
 import type { FormEvent, ReactNode } from 'react';
 import catalogue from '../../../../config/sets.json';
 import './landing.css';

@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {chromium} from '@playwright/test';
+import {FrontendAssetReadError,readFrontendAsset,serveFrontendAsset} from './render_frontend_asset.mjs';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const sha=value=>createHash('sha256').update(value).digest('hex');
 // Camera comparison is semantic; only Python canonical bytes define scene hashes.
@@ -149,18 +150,20 @@ const api=new Map([
 ]);
 const dist=await realpath(join(ROOT,'apps/web/dist'));await stat(join(dist,'index.html'));
 const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.webp':'image/webp','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
+const frontendAssetErrors=[];let frontendAssetReadError;
+const failFrontendAsset=error=>{if(!frontendAssetReadError){frontendAssetReadError=error;frontendAssetErrors.push(error.diagnostic);}void browser?.close().catch(()=>{});};
 const server=createServer(async(req,res)=>{try{
   if(req.method!=='GET'){res.writeHead(405).end();return;}
   const path=new URL(req.url,'http://127.0.0.1').pathname;
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
   if(api.has(path)){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(api.get(path)));return;}
   if(objects.has(path)){const item=objects.get(path);res.setHeader('Content-Type',item.type);res.end(item.bytes);return;}
-  if(path==='/'||path.startsWith('/assets/')||path.startsWith('/images/')||path.startsWith('/fonts/')){const file=await realpath(join(dist,path==='/'?'index.html':path.slice(1)));if(!file.startsWith(dist+'/'))throw new Error('Asset escapes builtfrontend');const info=await stat(file);if(info.size>16_000_000)throw new Error('Asset size bound');res.setHeader('Content-Type',types[extname(file)]??'application/octet-stream');res.end(await readFile(file));return;}
+  if(path==='/'||path.startsWith('/assets/')||path.startsWith('/images/')||path.startsWith('/fonts/')){const file=await realpath(join(dist,path==='/'?'index.html':path.slice(1)));if(!file.startsWith(dist+'/'))throw new Error('Asset escapes builtfrontend');await serveFrontendAsset(res,file,path,types[extname(file)]??'application/octet-stream',failFrontendAsset);return;}
   res.writeHead(404).end('Not available in candidate renderer');
 }catch{res.writeHead(404).end('Not available in candidate renderer');}});
 await mkdir(output,{recursive:false}); // Deliberately reject existing evidence directories.
 if(sourceViewBytes)await writeFile(join(output,'source-views.json'),sourceViewBytes,{flag:'wx'});
-const report={schema_version:'1.0',artifact_kind:'candidate_render_evidence',generated_at:new Date().toISOString(),input_sha256:inputSha,scene_sha256:normalized.scene_sha256,normalization:normalizationStats,set_number:scene.set_number,guide_id:scene.guide_id,revision:scene.revision,source_sha256:scene.source_sha256,input_path:input,geometry_provenance_sha256:sha(provenanceBytes),served_geometry_provenance_sha256:sha(publicProvenance),geometry_resource_count:selected.size,geometry_bytes:geometryBytes,viewer_build_sha256:sha(await readFile(join(dist,'index.html'))),range:{from,to,total_steps:scene.steps.length},viewport:{width,height},steps:[],console_errors:[],status:'running',limitations:['Actual existing Three.js viewer with isolated candidate API fixture; not software E2E or publication.','Image correspondence, connector validity, strength, human review and physical construction are not certified.','Frame samples are on-demand draw submissions, not sustained interactive FPS or GPU utilization.'],physical_build:'not_run',human_review:'not_run'};
+const report={schema_version:'1.0',artifact_kind:'candidate_render_evidence',generated_at:new Date().toISOString(),input_sha256:inputSha,scene_sha256:normalized.scene_sha256,normalization:normalizationStats,set_number:scene.set_number,guide_id:scene.guide_id,revision:scene.revision,source_sha256:scene.source_sha256,input_path:input,geometry_provenance_sha256:sha(provenanceBytes),served_geometry_provenance_sha256:sha(publicProvenance),geometry_resource_count:selected.size,geometry_bytes:geometryBytes,viewer_build_sha256:null,range:{from,to,total_steps:scene.steps.length},viewport:{width,height},steps:[],console_errors:[],frontend_asset_errors:frontendAssetErrors,status:'running',limitations:['Actual existing Three.js viewer with isolated candidate API fixture; not software E2E or publication.','Image correspondence, connector validity, strength, human review and physical construction are not certified.','Frame samples are on-demand draw submissions, not sustained interactive FPS or GPU utilization.'],physical_build:'not_run',human_review:'not_run'};
 let browser,cancelled=false;
 report.source_views_sha256=sourceViewBytes?sha(sourceViewBytes):null;
 report.source_view_count=sourceViews.size;
@@ -168,12 +171,17 @@ if(sourceViews.size)report.limitations.push('Requested-camera screenshots preser
 const cancel=()=>{cancelled=true;void browser?.close();server.close();};
 process.once('SIGINT',cancel);process.once('SIGTERM',cancel);
 try{
+ report.viewer_build_sha256=sha(await readFrontendAsset(join(dist,'index.html'),'/index.html'));
  await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});const origin=`http://127.0.0.1:${server.address().port}`;
  if(cancelled)throw new Error('Rendering cancelled');
  browser=await chromium.launch({headless:true});if(cancelled)throw new Error('Rendering cancelled');const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:1,reducedMotion:'reduce'});const page=await context.newPage();page.setDefaultTimeout(timeout);
  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort('blockedbyclient'));
  page.on('pageerror',error=>report.console_errors.push(error.message));
- await page.goto(origin+'/?benchmark=1');await page.getByLabel('Your set number').fill(scene.set_number);await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:/Open (tutorial|candidate)/,exact:true}).click();
+ await page.goto(origin+'/?benchmark=1');
+ const setSelector=page.getByLabel('Your set number');
+ if(await setSelector.evaluate(element=>element.tagName==='SELECT'))await setSelector.selectOption(scene.set_number);
+ else await setSelector.fill(scene.set_number);
+ await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:/Open (tutorial|candidate)/,exact:true}).click();
  const loaded=async()=>{const result=await page.waitForFunction(()=>{const failure=[...document.querySelectorAll('[role=alert]')].filter(el=>el.getClientRects().length).map(el=>el.textContent).join(' ');if(failure)return {error:failure};const replay=document.querySelector('button.replay');return replay&&!replay.disabled?{ready:true}:false;},{},{timeout});const state=await result.jsonValue();if(state.error)throw new Error(state.error);};
  await loaded();
  for(let index=from-1;index<to;index++){
@@ -197,6 +205,6 @@ try{
   await writeFile(join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
  }
  report.status='rendered';
-}catch(error){report.status=cancelled?'cancelled':'failed';report.error=String(error.message??error);process.exitCode=1;}
-finally{await browser?.close();await new Promise(resolve=>server.close(resolve));await writeFile(join(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
+}catch(error){if(error instanceof FrontendAssetReadError)failFrontendAsset(error);report.status=cancelled?'cancelled':'failed';report.error=String((frontendAssetReadError??error).message??error);process.exitCode=1;}
+finally{await browser?.close();await new Promise(resolve=>server.close(resolve));if(frontendAssetReadError&&!cancelled){report.status='failed';report.error=frontendAssetReadError.message;process.exitCode=1;}await writeFile(join(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
 console.log(JSON.stringify({status:report.status,scene_sha256:report.scene_sha256,rendered_steps:report.steps.length,report:join(output,'report.json'),error:report.error??null}));

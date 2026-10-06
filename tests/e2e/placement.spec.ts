@@ -20,7 +20,8 @@ test('instruction 9 red plates approach from underneath, and all steps have an e
   await page.goto('/');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('button',{name:'Play full build',exact:true})).toBeEnabled({timeout:30000});
   await page.getByLabel('Jump to instruction').selectOption('8');
-  // Freeze real rendered motion at a known frame; screenshot latency must not consume the 700ms replay.
+  await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','idle');
+  // Freeze real rendered motion at a known frame; screenshot latency must not consume the replay.
   await page.clock.pauseAt(new Date('2026-10-03T11:00:00Z'));
   const final=await redPosition(page,'instruction-9-final');
   await page.getByRole('button',{name:'Replay',exact:true}).click();
@@ -38,8 +39,8 @@ test('instruction 9 red plates approach from underneath, and all steps have an e
     await page.getByRole('button',{name:'Replay',exact:true}).click();
     await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','playing');
     const mode=await page.locator('.viewport').getAttribute('data-placement-mode');const reason=await page.locator('.viewport').getAttribute('data-placement-reason');
-    expect(['translate','highlight']).toContain(mode);
-    if([4,7,8].includes(index))expect(['below','blocked_approach']).toContain(reason);
+    expect(['translate','preview']).toContain(mode);
+    if([4,7,8].includes(index))expect(['below','blocked_approach']).toContain(await page.locator('.viewport').getAttribute('data-approach-reason'));
     outcomes.push({instruction:index+1,mode,reason});
     await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','idle');
   }

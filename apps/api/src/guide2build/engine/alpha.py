@@ -22,10 +22,11 @@ from ..catalog import find_guide
 from ..core.models import Pose, SourcePanel, StrictModel
 from ..releases.models import SceneV2, canonical, coverage_keys, digest
 from .contracts import Panel, strict_schema
+from .panel_index import PanelV2
 from .geometry import individual_catalogue_context, prepare_geometry
 from .provider import ProviderFailure
 
-ALPHA_VERSION = "source-direct-alpha-v1"
+ALPHA_VERSION = "source-direct-alpha-v2"
 MAX_PROMPT_BYTES = 980_000
 MAX_CONTEXT_BYTES = 650_000
 POLICY = """Generate a playable alpha assembly from ONLY these selected official LEGO PDF pages.
@@ -82,7 +83,7 @@ Return exactly the requested JSON, including nulls and empty arrays required by 
 NormalizedCoordinate = Annotated[float, Field(ge=0, le=1)]
 
 
-class AlphaPanel(Panel):
+class AlphaPanel(PanelV2):
     bbox: list[NormalizedCoordinate] = Field(min_length=4, max_length=4)
 
 
@@ -216,6 +217,8 @@ def _accepted_evidence_root(accepted, state, directory):
     if str(trial) in state["trials"] and trial.is_relative_to(directory / "alpha-proposals"):
         if accepted.get("artifact_kind") == "pdf_assisted_alpha_correction":
             raise ValueError("Agent correction cannot impersonate an inference trial")
+        if json.loads(_read(trial, "accepted.json")) != accepted:
+            raise ValueError("Alpha accepted checkpoint differs from its immutable receipt")
         return trial
     registration = next((entry for entry in state.get("corrections", [])
                          if entry["directory"] == str(trial)), None)
@@ -224,6 +227,8 @@ def _accepted_evidence_root(accepted, state, directory):
             or registration.get("actor_type") != "agent"
             or accepted["files"].get("correction-receipt.json") != registration["receipt_sha256"]):
         raise ValueError("Accepted alpha receipt escapes registered trials or evidenced agent corrections")
+    if json.loads(_read(trial, "accepted.json")) != accepted:
+        raise ValueError("Alpha accepted checkpoint differs from its immutable receipt")
     raw = _read(trial, "correction-receipt.json")
     if hashlib.sha256(raw).hexdigest() != registration["receipt_sha256"]:
         raise ValueError("Agent correction receipt changed before recovery")
@@ -268,7 +273,8 @@ def accept_alpha_correction(*, job, checkpoint, directory, source_hash, pages_di
     policy = checkpoint.get("alpha_policy", {})
     size = policy.get("page_batch_size")
     limit = policy.get("max_chunk_attempts")
-    if (policy.get("version") != ALPHA_VERSION or policy.get("source_sha256") != source_hash
+    if (policy != _execution_policy(job["config"], source_hash, page_count)
+            or policy.get("version") != ALPHA_VERSION or policy.get("source_sha256") != source_hash
             or policy.get("page_count") != page_count or page_count != guide["expected_page_count"]
             or isinstance(size, bool) or not isinstance(size, int) or not 4 <= size <= 8
             or isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5):
@@ -303,12 +309,20 @@ def accept_alpha_correction(*, job, checkpoint, directory, source_hash, pages_di
     previous = checkpoint.get("candidate") or continuation
     if checkpoint.get("candidate") is not None and continuation is not None and digest(previous) != digest(continuation):
         raise ValueError("Agent correction continuation differs from the accepted checkpoint")
+    regions = _alpha_regions(patch, job=job, checkpoint=checkpoint, source_hash=source_hash, bindings=bindings)
     scene = expand_alpha_patch(patch, job=job, source_hash=source_hash, page_count=page_count,
-                               page_indexes=indexes, previous=previous)
+                               page_indexes=indexes, previous=previous, region_index=regions)
     trial = directory / "alpha-corrections" / uuid.uuid4().hex
     trial.mkdir(parents=True)
     _json(trial / "patch.json", patch)
-    _json(trial / "review-notes.json", _notes(patch))
+    _json(trial / "region-index.json", regions)
+    _json(trial / "region-findings.json", _alpha_fresh_region_findings(regions, bindings, checkpoint.get("alpha_region_index")))
+    source_note = {"category": "coverage", "step_ids": [], "instance_ids": [],
+        "source_sha256": source_hash, "page_indexes": indexes, "actor_type": "agent", "actor_id": review.actor_id,
+        "reason": "Agent-inspected noninstruction batch: " + review.reason,
+        "alternatives": ["Correct the source index if a genuine assembly panel was missed."],
+        "review_status": "needs_review", "artifact_kind": "pdf_assisted_alpha_correction"}
+    _json(trial / "review-notes.json", [*_notes(patch), source_note])
     _json(trial / "page-observations.json", [p.model_dump(mode="json") for p in patch.page_observations])
     previous_hash = digest(previous) if previous else None
     receipt = {"artifact_kind": "pdf_assisted_alpha_correction", "correction_kind": "remove_false_empty_batch_blockers",
@@ -318,7 +332,8 @@ def accept_alpha_correction(*, job, checkpoint, directory, source_hash, pages_di
                "preserved_used": used, "preserved_limit": limit, "preserved_trials_sha256": digest(trials),
                "inference": "not_run", "assembly_approval": "not_run", "human_review": "not_run", "physical_build": "not_run"}
     _json(trial / "correction-receipt.json", receipt)
-    names = ["patch.json", "review-notes.json", "page-observations.json", "correction-receipt.json"]
+    names = ["patch.json", "review-notes.json", "page-observations.json", "correction-receipt.json",
+             "region-index.json", "region-findings.json"]
     if scene is not None:
         pins = _geometry_pins(scene, directory / "geometry")
         _json(trial / "geometry-pins.json", pins)
@@ -339,11 +354,6 @@ def accept_alpha_correction(*, job, checkpoint, directory, source_hash, pages_di
     checkpoint["artifact_kind"] = "automatic_alpha_with_agent_corrections"
     checkpoint.setdefault("alpha_assisted_corrections", []).append({**registration, "chunk_ordinal": ordinal,
         "source_sha256": source_hash, "page_indexes": indexes, "reason": review.reason, "unassisted_success": False})
-    checkpoint.setdefault("alpha_review_notes", []).append({"category": "coverage", "step_ids": [], "instance_ids": [],
-        "source_sha256": source_hash, "page_indexes": indexes, "actor_type": "agent", "actor_id": review.actor_id,
-        "reason": "Agent-inspected noninstruction batch: " + review.reason,
-        "alternatives": ["Correct the source index if a genuine assembly panel was missed."],
-        "review_status": "needs_review", "artifact_kind": "pdf_assisted_alpha_correction"})
     save("alpha_source_observation_corrected")
     return accepted
 
@@ -422,7 +432,7 @@ def compact_alpha_context(previous, max_bytes=MAX_CONTEXT_BYTES):
     return result
 
 
-def expand_alpha_patch(patch, *, job, source_hash, page_count, page_indexes, previous=None):
+def expand_alpha_patch(patch, *, job, source_hash, page_count, page_indexes, previous=None, region_index=None):
     """Deterministic append-only expansion; a provider cannot edit old snapshots."""
     patch = AlphaPatch.model_validate(patch)
     pages = set(page_indexes)
@@ -433,6 +443,8 @@ def expand_alpha_patch(patch, *, job, source_hash, page_count, page_indexes, pre
     if any(item.source.page_index not in pages for item in [*patch.new_instances, *patch.new_steps,
                                                           *patch.quantity_evidence]):
         raise ValueError("Alpha patch references a page outside the requested verified batch")
+    if region_index is not None:
+        _validate_alpha_region_index(region_index, patch, job, source_hash, page_count)
     guide = find_guide(job["set_number"], job["guide_id"])
     if previous is None:
         data = {"schema_version": "2.0", "set_number": job["set_number"], "guide_id": job["guide_id"],
@@ -503,24 +515,29 @@ def expand_alpha_patch(patch, *, job, source_hash, page_count, page_indexes, pre
     if not data["steps"]:
         if patch.new_instances or patch.new_sections:
             raise ValueError("Parts or sections without actual instructions cannot form an alpha model")
-        if any(page.panels for page in patch.page_observations):
+        if _batch_panels(patch, region_index):
             raise ValueError("Indexed instruction panels lack alpha snapshots")
         return None
     scene = SceneV2.model_validate(data)
     if any(p.origin != "vision_proposal" or p.mapping_status != "candidate" for p in scene.instances):
         raise ValueError("Alpha cannot impersonate reviewed part authoring")
     new_steps = scene.steps[len((previous or {}).get("steps", [])):]
-    _validate_batch_evidence(patch, scene, new_steps)
+    _validate_batch_evidence(patch, scene, new_steps, region_index=region_index)
     return scene
 
 
-def _unnumbered_panel_match(page_index, panel, step, parents):
+def _unnumbered_panel_match(page_index, panel, step, parents, parent=None):
     """Match an actual detail crop, not an unrelated snapshot sharing its parent number."""
     if (step.source.page_index != page_index or step.section_id != panel.section
             or not (step.substep_label and step.substep_label.strip()
                     or panel.kind == "attachment" and step.action == "attach_subassembly")
             or panel.kind == "attachment" and step.action not in {"add_parts", "attach_subassembly"}
             or step.main_step_number is not None and (step.section_id, step.main_step_number) not in parents):
+        return False
+    if panel.kind == "substep" and panel.number is not None:
+        if step.substep_label not in {str(panel.number), panel.label}:
+            return False
+    if parent and (step.section_id, step.main_step_number) != parent:
         return False
     left, top, right, bottom = step.source.bbox
     pleft, ptop, pright, pbottom = panel.bbox
@@ -531,18 +548,71 @@ def _unnumbered_panel_match(page_index, panel, step, parents):
     return overlap / ((right - left) * (bottom - top)) >= 0.8
 
 
-def _validate_batch_evidence(patch, scene, new_steps):
-    indexed = [(page.page_index, panel) for page in patch.page_observations for panel in page.panels]
-    unnumbered = [(page, panel) for page, panel in indexed
-                  if panel.kind in {"substep", "attachment"} and panel.number is None]
+def _main_panel_match(page_index, panel, step):
+    if (step.source.page_index != page_index or step.section_id != panel.section
+            or step.main_step_number != panel.number or panel.kind == "main" and step.substep_label is not None):
+        return False
+    left, top, right, bottom = step.source.bbox
+    pleft, ptop, pright, pbottom = panel.bbox
+    overlap = max(0, min(right, pright)-max(left, pleft)) * max(0, min(bottom, pbottom)-max(top, ptop))
+    return overlap / ((right-left) * (bottom-top)) >= 0.8
+
+
+def _batch_panels(patch, region_index=None):
+    if region_index is None:
+        if any(panel.role not in {"build_event", "ambiguous"} and panel.semantic_status == "explicit"
+               for page in patch.page_observations for panel in page.panels):
+            raise ValueError("Semantic source-only regions require a verified source-region index")
+        return [(page.page_index, panel) for page in patch.page_observations for panel in page.panels]
+    pages = {page.page_index for page in patch.page_observations}
+    return [(item["page_index"], Panel.model_validate(item["panel"]))
+            for item in region_index["reconstruction_panels"] if item["page_index"] in pages]
+
+
+def _validate_alpha_region_index(index, patch, job, source_hash, page_count):
+    from .panel_index import normalize_partial
+
+    required = {"source", "source_pages", "raw_page_indexes", "reconstruction_panels", "normalization_sha256"}
+    if not isinstance(index, dict) or not required <= set(index):
+        raise ValueError("Alpha semantic source index lacks an authenticated normalized receipt")
+    if index["source"] != {"set_number": job["set_number"], "guide_id": job["guide_id"], "source_sha256": source_hash}:
+        raise ValueError("Alpha semantic source index belongs to a different verified guide")
+    recomputed = normalize_partial(index["raw_page_indexes"], source_sha256=source_hash,
+        source_pages=index["source_pages"], set_number=job["set_number"], guide_id=job["guide_id"])
+    if recomputed != index:
+        raise ValueError("Alpha semantic source index changed from its retained source observations")
+    observed = {item["page_index"]: item for item in index["raw_page_indexes"]}
+    requested = {page.page_index for page in patch.page_observations}
+    if any(not 0 <= page < page_count for page in observed) or not requested <= set(observed):
+        raise ValueError("Alpha semantic source index differs from the requested booklet pages")
+    for page in patch.page_observations:
+        row = observed[page.page_index]
+        if row["panels"] != [panel.model_dump(mode="json") for panel in page.panels] or row["uncertainty"] != page.uncertainties:
+            raise ValueError("Alpha semantic source index differs from its actual proposed source panels")
+
+
+def _validate_batch_evidence(patch, scene, new_steps, *, region_index=None):
+    indexed = _batch_panels(patch, region_index)
     panels = {(page, p.section, p.number) for page, p in indexed
               if p.kind != "substep" and not (p.kind == "attachment" and p.number is None)}
-    parents = {(p.section, p.number) for _, p in indexed if p.kind == "main" and p.number is not None}
+    parents = {(p.section, p.number) for _, p in indexed if p.kind in {"main", "attachment"} and p.number is not None}
     previous_steps = scene.steps[:len(scene.steps) - len(new_steps)]
     parents.update((step.section_id, step.main_step_number) for step in previous_steps
                    if step.main_step_number is not None)
-    candidates = [[index for index, step in enumerate(new_steps)
-                   if _unnumbered_panel_match(page, panel, step, parents)] for page, panel in unnumbered]
+    associated_parents = {}
+    if region_index:
+        by_key = {item["region_key"]: item for item in region_index["retained_regions"]}
+        for region in region_index["retained_regions"]:
+            parent = by_key.get(region["associated_region_key"])
+            if parent:
+                associated_parents[(region["page_index"], digest(region["panel"]))] = (parent["panel"]["section"], parent["panel"]["number"])
+    candidates = []
+    for page, panel in indexed:
+        detail = panel.kind == "substep" or panel.kind == "attachment" and panel.number is None
+        candidates.append([index for index, step in enumerate(new_steps)
+            if (_unnumbered_panel_match(page, panel, step, parents,
+                    associated_parents.get((page, digest(panel.model_dump(mode="json")))))
+                if detail else _main_panel_match(page, panel, step))])
     assigned = {}
 
     def assign(panel_index, seen):
@@ -555,19 +625,29 @@ def _validate_batch_evidence(patch, scene, new_steps):
                 return True
         return False
 
-    unmatched = [index for index in range(len(unnumbered)) if not assign(index, set())]
-    detail_steps = {index for choices in candidates for index in choices}
+    unmatched = [index for index in range(len(indexed)) if not assign(index, set())]
+    detail_steps = {index for (page, panel), choices in zip(indexed, candidates, strict=True)
+                    if panel.kind == "substep" or panel.kind == "attachment" and panel.number is None
+                    for index in choices}
     covered = {(step.source.page_index, step.section_id, step.main_step_number)
                for index, step in enumerate(new_steps) if index not in detail_steps}
     missing, extra = panels - covered, covered - panels
-    if missing or extra or unmatched:
+    extra_snapshots = set(range(len(new_steps))) - set(assigned)
+    if missing or extra or unmatched or extra_snapshots:
         def ordered(groups):
             return sorted(groups, key=lambda item: (item[0], item[1], item[2] or 0))
         feedback = {"missing_groups": ordered(missing)[:16], "extra_groups": ordered(extra)[:16],
                     "missing_group_count": len(missing), "extra_group_count": len(extra),
-                    "unmatched_unnumbered_panels": [{"page_index": unnumbered[index][0],
-                        **unnumbered[index][1].model_dump(mode="json")} for index in unmatched[:16]],
-                    "unmatched_unnumbered_count": len(unmatched)}
+                    "unmatched_unnumbered_panels": [{"page_index": indexed[index][0],
+                        **indexed[index][1].model_dump(mode="json")} for index in unmatched[:16]
+                        if indexed[index][1].kind == "substep" or indexed[index][1].kind == "attachment" and indexed[index][1].number is None],
+                    "unmatched_unnumbered_count": sum(indexed[index][1].kind == "substep" or
+                        indexed[index][1].kind == "attachment" and indexed[index][1].number is None for index in unmatched),
+                    "unmatched_required_regions": [{"page_index": indexed[index][0],
+                        **indexed[index][1].model_dump(mode="json")} for index in unmatched[:16]],
+                    "unmatched_required_region_count": len(unmatched),
+                    "extra_snapshot_count": len(extra_snapshots),
+                    "extra_snapshot_ids": [new_steps[index].step_id for index in sorted(extra_snapshots)[:16]]}
         raise ValueError("Alpha snapshots and fresh indexed main/attachment panels disagree: "
                          + json.dumps(feedback, separators=(",", ":")))
     ids = {p.instance_id for p in scene.instances}
@@ -694,6 +774,92 @@ def _notes(patch):
     return result
 
 
+def _alpha_regions(patch, *, job, checkpoint, source_hash, bindings):
+    """Retain all depicted regions; fresh build events alone require new snapshots."""
+    from .panel_index import normalize_partial
+
+    observations = [*checkpoint.get("alpha_page_observations", []),
+                    *(page.model_dump(mode="json") for page in patch.page_observations)]
+    pages = {item["page_index"]: item for state in checkpoint.get("alpha_chunks", {}).values()
+             for item in state.get("accepted", {}).get("pages", [])}
+    pages.update({item["page_index"]: item for item in bindings})
+    indexes = [{"schema_version": "2.0", "source_sha256": source_hash,
+                "page_index": item["page_index"], "page_sha256": pages[item["page_index"]]["sha256"],
+                "panels": item["panels"], "uncertainty": item["uncertainties"]}
+               for item in observations]
+    return normalize_partial(indexes, source_sha256=source_hash,
+        source_pages=[pages[index] for index in sorted(pages)], set_number=job["set_number"], guide_id=job["guide_id"])
+
+
+def _alpha_feedback(checkpoint, candidate, rejected):
+    from .repair_feedback import compact_feedback
+
+    steps = (candidate or {}).get("steps", [])[-4:]
+    affected = sorted({identity for step in steps for identity in step["active_instance_ids"]})
+    notes = checkpoint.get("alpha_review_notes", [])
+    return {"retained_quality": compact_feedback(notes, [step["step_id"] for step in steps], affected,
+                                                input_truncated=None),
+            "latest_rejection": rejected[-1] if rejected else None,
+            "rejected_history_sha256": digest(rejected), "superseded_rejection_count": max(0, len(rejected)-1),
+            "scope": "The latest attempted-batch failure is always retained separately from accepted-history quality notes."}
+
+
+def _alpha_diagnostics(scene, previous, patch, geometry):
+    from .hypotheses import diagnose_candidate
+
+    # Heavy contact/mesh checks are limited to recent snapshots. Omitted history
+    # and unsupported geometry stay explicit unknowns; they are never a pass.
+    ids = [step.step_id for step in patch.new_steps][-4:]
+    report = diagnose_candidate(scene, previous, geometry, checked_step_ids=ids)
+    return {"scene_sha256": digest(scene), "requested_step_ids": ids, **report,
+            "scope": "Bounded local diagnostics only; source, connector and physical correctness remain unverified."}
+
+
+def _alpha_fresh_region_findings(regions, bindings, previous=None):
+    pages = {item["page_index"] for item in bindings}
+    prior_global = {digest(item) for item in (previous or {}).get("findings", []) if item.get("page_index") is None}
+    return [item for item in regions["findings"] if item.get("page_index") in pages
+            or item.get("page_index") is None and digest(item) not in prior_global]
+
+
+def _alpha_receipt_notes(trial, record):
+    notes = json.loads(_read(trial, "review-notes.json"))
+    if "region-findings.json" in record["files"]:
+        notes.extend(json.loads(_read(trial, "region-findings.json")))
+    if "diagnostics.json" in record["files"]:
+        diagnostic = json.loads(_read(trial, "diagnostics.json"))
+        notes.extend(diagnostic["findings"])
+        if diagnostic.get("findings_truncated") or diagnostic.get("coverage", {}).get("status") == "partial":
+            notes.append({"code": "diagnostics_incomplete", "message": "This batch has bounded or truncated diagnostic coverage; omitted checks remain unknown.",
+                          "step_ids": diagnostic["requested_step_ids"], "instance_ids": [],
+                          "diagnostics_truncated": diagnostic.get("findings_truncated", False),
+                          "diagnostic_receipt_sha256": record["files"]["diagnostics.json"]})
+    return notes
+
+
+def _execution_policy(config, source_hash, page_count):
+    """One frozen contract for fresh generation and evidenced correction replay."""
+    from .hypotheses import VERSION as hypotheses_version
+    from .panel_index import REGION_PROMPT, INDEX_VERSION, EVENT_REGISTRY_VERSION
+    from .repair_feedback import VERSION as feedback_version, PROMPT_VERSION as feedback_prompt_version
+    size = config.get("alpha_page_batch_size", 6)
+    limit = config.get("max_chunk_attempts", 5)
+    if isinstance(size, bool) or not isinstance(size, int) or not 4 <= size <= 8:
+        raise ValueError("Alpha source batches must contain at most 4 to 8 pages, with a shorter final batch")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5:
+        raise ValueError("Alpha attempts must be an integer between 1 and 5")
+    return {"version": ALPHA_VERSION, "source_sha256": source_hash, "page_count": page_count,
+              "page_batch_size": size, "max_chunk_attempts": limit,
+              "runtime_choice": {"model": config.get("model", "gpt-6-astra"), "reasoning": config.get("reasoning", "high")},
+              "patch_schema_sha256": digest(strict_schema(AlphaPatch)),
+              "source_index_version": INDEX_VERSION, "hypotheses_version": hypotheses_version,
+              "source_event_registry_version": EVENT_REGISTRY_VERSION,
+              "repair_feedback_version": feedback_version,
+              "repair_feedback_prompt_version": feedback_prompt_version,
+              "prompt_sha256": hashlib.sha256((POLICY + REGION_PROMPT).encode()).hexdigest(),
+              "material_choice": "most_likely_source_with_alternatives", "pose_choice": "direct_source_approximation"}
+
+
 def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, pages_dir,
                    page_count, save, heartbeat, continuation=None, max_chunks=None):
     """Build or resume frozen alpha chunks; return a candidate, or None if blocked.
@@ -710,15 +876,10 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
     if isinstance(page_count, bool) or page_count != guide["expected_page_count"]:
         raise ValueError("Alpha page count differs from curated selected booklet")
     config = job["config"]
-    size = config.get("alpha_page_batch_size", 6)
-    limit = config.get("max_chunk_attempts", 5)
-    if isinstance(size, bool) or not isinstance(size, int) or not 4 <= size <= 8:
-        raise ValueError("Alpha source batches must contain at most 4 to 8 pages, with a shorter final batch")
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5:
-        raise ValueError("Alpha attempts must be an integer between 1 and 5")
-    policy = {"version": ALPHA_VERSION, "source_sha256": source_hash, "page_count": page_count,
-              "page_batch_size": size, "max_chunk_attempts": limit,
-              "material_choice": "most_likely_source_with_alternatives", "pose_choice": "direct_source_approximation"}
+    from .panel_index import REGION_PROMPT, event_registry
+    from .repair_feedback import prompt_feedback
+    policy = _execution_policy(config, source_hash, page_count)
+    size, limit = policy["page_batch_size"], policy["max_chunk_attempts"]
     if checkpoint.get("alpha_policy", policy) != policy:
         raise ValueError("Frozen alpha source, policy or attempt budget changed on resume")
     checkpoint["alpha_policy"] = policy
@@ -742,6 +903,8 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
     _json(Path(directory) / "individual-part-index.json", {"scope": "verified generic individual Part identities only",
         "rows": catalogue_index, "sha256": digest(catalogue_index)})
     # Completed cursors do not exempt accepted bytes/source bindings from checks.
+    authenticated_observations, authenticated_notes = [], []
+    last_regions = None
     for past in range(completed):
         record = states.get(str(past), {}).get("accepted")
         if not record or record["source_sha256"] != source_hash or record["policy"] != policy:
@@ -752,7 +915,21 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
         for name, expected_hash in record["files"].items():
             if hashlib.sha256(_read(trial, name)).hexdigest() != expected_hash:
                 raise ValueError("Completed alpha evidence changed before resume")
+        authenticated_observations.extend(json.loads(_read(trial, "page-observations.json")))
+        authenticated_notes.extend(_alpha_receipt_notes(trial, record))
+        if "region-index.json" in record["files"]:
+            last_regions = json.loads(_read(trial, "region-index.json"))
     if completed:
+        if checkpoint.get("alpha_page_observations", authenticated_observations) != authenticated_observations:
+            raise ValueError("Completed alpha source observations differ from authenticated receipts")
+        if checkpoint.get("alpha_review_notes", authenticated_notes) != authenticated_notes:
+            raise ValueError("Completed alpha findings differ from authenticated receipts")
+        checkpoint["alpha_page_observations"] = authenticated_observations
+        checkpoint["alpha_review_notes"] = authenticated_notes
+        if last_regions is not None:
+            if checkpoint.get("alpha_region_index", last_regions) != last_regions:
+                raise ValueError("Completed alpha semantic source index differs from authenticated receipts")
+            checkpoint["alpha_region_index"] = last_regions
         record = states[str(completed - 1)]["accepted"]
         if record["scene_sha256"] != (digest(candidate) if candidate else None):
             raise ValueError("Completed alpha candidate differs from its accepted receipt")
@@ -783,8 +960,11 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
                 if hashlib.sha256(_read(trial, name)).hexdigest() != expected:
                     raise ValueError("Accepted alpha evidence changed before recovery")
             patch = AlphaPatch.model_validate_json(_read(trial, "patch.json"))
+            regions = _alpha_regions(patch, job=job, checkpoint=checkpoint, source_hash=source_hash, bindings=bindings)
+            if "region-index.json" in accepted["files"] and json.loads(_read(trial, "region-index.json")) != regions:
+                raise ValueError("Accepted alpha semantic source index changed before recovery")
             scene = expand_alpha_patch(patch, job=job, source_hash=source_hash, page_count=page_count,
-                                       page_indexes=indexes, previous=candidate)
+                                       page_indexes=indexes, previous=candidate, region_index=regions)
             if (digest(scene) if scene else None) != accepted["scene_sha256"]:
                 raise ValueError("Accepted alpha deterministic scene changed before recovery")
             if scene is not None:
@@ -800,7 +980,9 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
             checkpoint["current_alpha_attempt"] = {"chunk": ordinal + 1, "attempt": state["used"], "limit": limit}
             save("alpha_repairing_chunk" if state["used"] > 1 else "alpha_constructing_chunk")
             context = compact_alpha_context(candidate)
-            prompt = POLICY + "\n" + json.dumps({"set_number": job["set_number"], "guide_id": job["guide_id"],
+            focused = _alpha_feedback(checkpoint, candidate, state["feedback"])
+            _json(trial / "prompt-feedback.json", focused)
+            prompt = POLICY + "\n" + REGION_PROMPT + "\nReturn AlphaPatch; the host supplies page/source bindings for its semantic index.\n" + json.dumps({"set_number": job["set_number"], "guide_id": job["guide_id"],
                 "source_sha256": source_hash, "official_url": guide["pdf_url"], "page_count": page_count,
                 "input_image_page_order_zero_based": indexes, "current_own_assembly": context,
                 "input_image_dimensions": dimensions,
@@ -808,7 +990,9 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
                 "all_verified_individual_part_id_description_rows": catalogue_index,
                 "individual_catalogue_scope": "partial_cached_individual_geometry_not_a_design_allowlist",
                 "individual_geometry_only": catalogue,
-                "repair_feedback": state["feedback"][-3:]}, separators=(",", ":"))
+                "repair_feedback": {**focused, "retained_quality": prompt_feedback(focused["retained_quality"])},
+                "source_region_associations": event_registry(checkpoint["alpha_region_index"]) if checkpoint.get("alpha_region_index") else None,
+                "feedback_rule": "Findings are diagnostic, not gates. Localize repairs to indicated pieces and preserve rigid groups; omitted or unsupported checks remain unresolved."}, separators=(",", ":"), ensure_ascii=False)
             if len(prompt.encode()) > MAX_PROMPT_BYTES:
                 raise ValueError("Alpha proposal prompt exceeds bounded context; partition source/context")
             try:
@@ -816,8 +1000,11 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
                                     strict_schema(AlphaPatch), trial / "provider", heartbeat.check)
                 patch = AlphaPatch.model_validate(raw)
                 _json(trial / "patch.json", patch)
+                regions = _alpha_regions(patch, job=job, checkpoint=checkpoint, source_hash=source_hash, bindings=bindings)
+                _json(trial / "region-index.json", regions)
+                _json(trial / "region-findings.json", _alpha_fresh_region_findings(regions, bindings, checkpoint.get("alpha_region_index")))
                 scene = expand_alpha_patch(patch, job=job, source_hash=source_hash, page_count=page_count,
-                                           page_indexes=indexes, previous=candidate)
+                                           page_indexes=indexes, previous=candidate, region_index=regions)
                 if _page_bindings(Path(pages_dir), indexes) != bindings:
                     raise ValueError("Alpha source page changed during proposal")
                 if scene is not None:
@@ -825,11 +1012,12 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
                                                                 Path(directory) / "geometry", shared_geometry)
                     _json(trial / "geometry-report.json", geometry_report)
                     _json(trial / "geometry-pins.json", _geometry_pins(scene, Path(directory) / "geometry"))
+                    _json(trial / "diagnostics.json", _alpha_diagnostics(scene, candidate, patch, Path(directory) / "geometry"))
                 _json(trial / "review-notes.json", _notes(patch))
                 _json(trial / "page-observations.json", [o.model_dump(mode="json") for o in patch.page_observations])
-                names = ["patch.json", "review-notes.json", "page-observations.json"]
+                names = ["patch.json", "review-notes.json", "page-observations.json", "region-index.json", "region-findings.json", "prompt-feedback.json"]
                 if scene is not None:
-                    names += ["geometry-report.json", "geometry-pins.json"]
+                    names += ["geometry-report.json", "geometry-pins.json", "diagnostics.json"]
                 accepted = {"directory": str(trial), "source_sha256": source_hash, "pages": bindings,
                             "previous_scene_sha256": previous_hash, "scene_sha256": digest(scene) if scene else None,
                             "policy": policy, "files": {name: hashlib.sha256(_read(trial, name)).hexdigest() for name in names},
@@ -861,13 +1049,21 @@ def generate_alpha(*, store, job, provider, checkpoint, directory, source_hash, 
         checkpoint["alpha_completed_chunks"] = ordinal + 1
         checkpoint["alpha_completed_pages"] = sum(len(batch) for batch in batches[:ordinal + 1])
         checkpoint.setdefault("alpha_page_observations", []).extend(o.model_dump(mode="json") for o in patch.page_observations)
-        checkpoint.setdefault("alpha_review_notes", []).extend(_notes(patch))
+        checkpoint.setdefault("alpha_review_notes", []).extend(_alpha_receipt_notes(trial, accepted))
+        checkpoint["alpha_region_index"] = regions
+        if "diagnostics.json" in accepted["files"]:
+            diagnostics = json.loads(_read(trial, "diagnostics.json"))
+            if diagnostics["scene_sha256"] != accepted["scene_sha256"]:
+                raise ValueError("Alpha diagnostic receipt differs from its accepted scene")
+            checkpoint.setdefault("alpha_diagnostics", []).append({"chunk_ordinal": ordinal,
+                "path": str(trial / "diagnostics.json"), "sha256": accepted["files"]["diagnostics.json"]})
         keys = coverage_keys(SceneV2.model_validate(candidate)) if candidate is not None else []
         checkpoint["completed_panels"] = len(keys)
         checkpoint["total_panels"] = len(keys) if ordinal + 1 == len(batches) else None
         _json(Path(directory) / "coverage-index.json", {"source_sha256": source_hash,
             "page_indexes": [{"panels": o["panels"], "uncertainty": o["uncertainties"]}
                              for o in checkpoint["alpha_page_observations"]],
+            "source_regions": regions,
             "verification": "alpha_model_index_unverified", "covered_step_keys": keys,
             "completed_source_pages": checkpoint["alpha_completed_pages"], "expected_source_pages": page_count})
         _json(Path(directory) / "alpha-review-notes.json", {"status": "needs_review", "notes": checkpoint["alpha_review_notes"],

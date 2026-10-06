@@ -1,13 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { IconChevronLeft, IconChevronRight, IconRotate, IconRotateClockwise, IconPlus, IconMinus, IconArrowsMoveHorizontal, IconFocus2, IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconCube, IconX, IconInfoCircle, IconBook2 } from '@tabler/icons-react';
+import IconChevronLeft from '@tabler/icons-react/dist/esm/icons/IconChevronLeft.mjs';
+import IconChevronRight from '@tabler/icons-react/dist/esm/icons/IconChevronRight.mjs';
+import IconRotate from '@tabler/icons-react/dist/esm/icons/IconRotate.mjs';
+import IconRotateClockwise from '@tabler/icons-react/dist/esm/icons/IconRotateClockwise.mjs';
+import IconPlus from '@tabler/icons-react/dist/esm/icons/IconPlus.mjs';
+import IconMinus from '@tabler/icons-react/dist/esm/icons/IconMinus.mjs';
+import IconArrowsMoveHorizontal from '@tabler/icons-react/dist/esm/icons/IconArrowsMoveHorizontal.mjs';
+import IconFocus2 from '@tabler/icons-react/dist/esm/icons/IconFocus2.mjs';
+import IconPlayerPlay from '@tabler/icons-react/dist/esm/icons/IconPlayerPlay.mjs';
+import IconPlayerPause from '@tabler/icons-react/dist/esm/icons/IconPlayerPause.mjs';
+import IconPlayerStop from '@tabler/icons-react/dist/esm/icons/IconPlayerStop.mjs';
+import IconCube from '@tabler/icons-react/dist/esm/icons/IconCube.mjs';
+import IconX from '@tabler/icons-react/dist/esm/icons/IconX.mjs';
+import IconInfoCircle from '@tabler/icons-react/dist/esm/icons/IconInfoCircle.mjs';
+import IconBook2 from '@tabler/icons-react/dist/esm/icons/IconBook2.mjs';
 import type { Guide, SceneManifest } from '../contracts';
 import type { AlphaReleaseMetadata, ReleaseLoader } from '../releases';
-import type { ImageQuality } from '../api';
+import type { ImageQuality, ExplorationStatus } from '../api';
+import ExplorationFindings from './ExplorationFindings';
 import { partsList, readProgress, saveProgress } from '../state';
 import AssemblyViewport, { type CameraCommand } from './AssemblyViewport';
 import SourcePanel from './SourcePanel';
 import ReviewPanel from './ReviewPanel';
-export default function ViewerWorkspace({ scene: initialScene, guide, onClose, onScene, publicMode=false, releaseAlpha, previewMode=false, previewExperiment, previewJobId, previewQuality, previewGenerationMode, previewArtifactKind, previewUncertaintyNotes, previewCoverage, previewSourceCoverage, sourceImages=!publicMode, releaseLoader }: {publicMode?:boolean; releaseAlpha?:AlphaReleaseMetadata; previewMode?:boolean; previewExperiment?:string; previewJobId?:string; previewQuality?:ImageQuality; previewGenerationMode?:'standard'|'alpha_fast'; previewArtifactKind?:string; previewUncertaintyNotes?:string[]; previewCoverage?:string; previewSourceCoverage?:string; sourceImages?:boolean; releaseLoader?:ReleaseLoader; scene: SceneManifest; guide: Guide; onClose: () => void; onScene: (scene: SceneManifest) => void}) {
+export default function ViewerWorkspace({ scene: initialScene, guide, onClose, onScene, publicMode=false, releaseAlpha, previewMode=false, previewExperiment, previewJobId, previewQuality, previewGenerationMode, previewArtifactKind, previewUncertaintyNotes, previewCoverage, previewSourceCoverage, exploration, sourceImages=!publicMode, releaseLoader }: {publicMode?:boolean; releaseAlpha?:AlphaReleaseMetadata; previewMode?:boolean; previewExperiment?:string; previewJobId?:string; previewQuality?:ImageQuality; previewGenerationMode?:'standard'|'alpha_fast'; previewArtifactKind?:string; previewUncertaintyNotes?:string[]; previewCoverage?:string; previewSourceCoverage?:string; exploration?:ExplorationStatus|null; sourceImages?:boolean; releaseLoader?:ReleaseLoader; scene: SceneManifest; guide: Guide; onClose: () => void; onScene: (scene: SceneManifest) => void}) {
   const [scene,setLoadedScene] = useState(initialScene);
   const [chunkError,setChunkError] = useState('');
   const [chunkRetry,setChunkRetry] = useState(0);
@@ -62,7 +77,7 @@ export default function ViewerWorkspace({ scene: initialScene, guide, onClose, o
   const stepLabel=(s:typeof step)=>s.printed_step_number===null?'Unnumbered instruction':`Step ${s.main_step_number}`;
   const mainSteps = new Set(scene.steps.filter(s=>s.printed_step_number!==null&&s.main_step_number!==null).map(groupKey)).size;
   const assisted = scene.instances.some(p=>p.origin==='pdf_assisted_authoring');
-  const artifactLabel = releaseAlpha||previewMode&&previewArtifactKind==='pdf_assisted_alpha_completion'?'PDF-assisted alpha completion':previewMode&&previewArtifactKind==='automatic_alpha_with_agent_corrections'?'Alpha model with agent source corrections':assisted?'PDF-assisted reference':'Reconstruction candidate';
+  const artifactLabel = exploration||releaseAlpha?.artifact_kind==='exploration_candidate'?'Exploration candidate':releaseAlpha||previewMode&&previewArtifactKind==='pdf_assisted_alpha_completion'?'PDF-assisted alpha completion':previewMode&&previewArtifactKind==='automatic_alpha_with_agent_corrections'?'Alpha model with agent source corrections':assisted?'PDF-assisted reference':'Reconstruction candidate';
   const fastAlpha = previewMode && previewGenerationMode==='alpha_fast';
   const alpha = previewMode && (fastAlpha || previewQuality?.profile==='alpha');
   const selectedSourceCovered = fastAlpha && ['assisted_complete_source_review_alpha_unverified','all_pages_processed_approximate_unverified'].includes(previewSourceCoverage??'');
@@ -77,12 +92,13 @@ export default function ViewerWorkspace({ scene: initialScene, guide, onClose, o
   return <section className="workspace">
     <header className="studio-header">
       <button className="brand studio-brand" onClick={onClose} aria-label="Back to set lookup">Guide2Build <span>3D</span></button>
-      <div className="workspace-heading"><h1><span>{scene.set_number}</span><span className="header-divider">/</span>{guide.label}</h1><span className="candidate-status">{releaseAlpha?'Alpha model · unverified':alpha?'Alpha sample · unverified':`${previewMode?'Local engine candidate':publicMode?'Published tutorial':assisted?'PDF-assisted':'Candidate'} · ${scene.status.replaceAll('_',' ')}`}</span></div>
+      <div className="workspace-heading"><h1><span>{scene.set_number}</span><span className="header-divider">/</span>{guide.label}</h1><span className="candidate-status">{exploration?'Exploration · provisional':releaseAlpha?'Alpha model · unverified':alpha?'Alpha sample · unverified':`${previewMode?'Local engine candidate':publicMode?'Published tutorial':assisted?'PDF-assisted':'Candidate'} · ${scene.status.replaceAll('_',' ')}`}</span></div>
       <div className="studio-actions">{!publicMode&&<button ref={reviewButton} className="secondary review-toggle" aria-expanded={review} onClick={()=>{setPlayback(state=>state==='playing'?'paused':state);setReview(v=>!v);}}>{review?'Close review':'Review candidate'}</button>}
       <details className="provenance"><summary aria-label="Source, revision and checks" title="Source, revision and checks"><IconInfoCircle size={21} aria-hidden="true"/><span className="sr-only">Source, revision and checks</span></summary><div className="provenance-content"><h2>Reconstruction details</h2>
         {releaseAlpha&&<><p><strong>Alpha model · unverified</strong><br/>Approximate reconstruction from official instructions. Part choices, colours and placements are unverified; visible gaps or overlaps may remain.</p><p>{releaseAlpha.coverage_text}</p>{releaseAlpha.uncertainty_notes.length>0&&<ul>{releaseAlpha.uncertainty_notes.map((note,i)=><li key={i}>{note}</li>)}</ul>}</>}
         {fastAlpha&&<><p><strong>Alpha sample · unverified</strong><br/>Approximate model from official instructions. Colour, part choice and placement are unverified; visible gaps or overlaps may remain. Camera alignment has not been checked.</p>{previewCoverage&&<p>{previewCoverage}</p>}{previewUncertaintyNotes&&previewUncertaintyNotes.length>0&&<ul>{previewUncertaintyNotes.map((note,i)=><li key={i}>{note}</li>)}</ul>}</>}
         {alpha&&!fastAlpha&&previewQuality&&<><p><strong>Alpha sample · unverified</strong><br/>Image alignment tolerance: {previewQuality.max_rms_pixels} px RMS (strict: {previewQuality.strict_max_rms_pixels} px), {previewQuality.max_point_pixels} px per landmark.</p>{imageChecks.map(check=><p key={check.step_id}>Instruction {scene.steps.find(s=>s.step_id===check.step_id)?.main_step_number??check.step_id}: {check.rms_pixels.toFixed(2)} px RMS, {check.max_error_pixels.toFixed(2)} px worst landmark. Exceeds strict image alignment; needs review.</p>)}</>}
+        {exploration&&<p><strong>Complete-booklet exploration</strong><br/>{previewCoverage}<br/>Quality findings guide later repairs. These snapshots remain provisional.<br/>{exploration.model_calls_used} of {exploration.max_model_calls} model calls used across this correction lineage.</p>}
         {previewMode&&<p>Local engine candidate · unpublished<br/>Experiment: {previewExperiment??'Not recorded in this render session'}{previewJobId&&<><br/>Job: {previewJobId}</>}</p>}
         <p><strong>{artifactLabel} · {scene.status.replaceAll('_',' ')}</strong></p>
         <p>{assisted?'Authored from source evidence; not an automatic PDF conversion. ':''}{releaseAlpha?'Human review: not run':`Human acceptance: ${scene.status==='human_reviewed'?'recorded':'not recorded'}`} · Physical build: {scene.physical_build_check.replaceAll('_',' ')}</p>
@@ -107,7 +123,8 @@ export default function ViewerWorkspace({ scene: initialScene, guide, onClose, o
           <div className="parts-toggle"><button className={!allParts?'selected':''} aria-pressed={!allParts} onClick={()=>setAllParts(false)}>New pieces</button><button className={allParts?'selected':''} aria-pressed={allParts} onClick={()=>setAllParts(true)}>Full parts list</button></div>
           {rows.length?<table className="parts-table"><thead className="sr-only"><tr><th>Part / colour</th><th>Qty</th></tr></thead><tbody>{rows.map(row=><tr key={`${row.partId}:${row.color}`}><td><div className="part-identity">{thumbnails[`${row.partId}:${row.color}`]&&<img src={thumbnails[`${row.partId}:${row.color}`]} alt={`Part ${row.partId}, colour ${row.color}`} width="72" height="72"/>}<span><strong>{row.partId}</strong><small>{colorNames[row.color]||`Colour ${row.color}`}</small></span></div></td><td>×{row.quantity}</td></tr>)}</tbody></table>:<p className="empty-pieces">No new pieces. Use the subassembly you have already built.</p>}
           <details className="physical-pieces"><summary>Active {releaseAlpha?'model components':'physical pieces'} ({step.active_instance_ids.length})</summary><ol>{step.active_instance_ids.map(id=><li key={id}>{id}</li>)}</ol></details>
-          {index===scene.steps.length-1&&<p className="end-note">End of this revision · {releaseAlpha?'Assembly details remain unverified. See the reported coverage in reconstruction details.':selectedSourceCovered ? 'All selected source pages are covered. Assembly details remain unverified.' : guide.expected_main_steps == null ? 'Full booklet coverage has not been verified.' : mainSteps===guide.expected_main_steps?'All expected main-step numbers are represented. Review status still applies.':'This is a partial reconstruction; remaining instructions require review.'}</p>}
+          {exploration&&<ExplorationFindings diagnostics={exploration} step={step} onNavigate={id=>{const target=scene.steps.findIndex(s=>s.step_id===id);if(target>=0)change(target);}}/>}
+          {index===scene.steps.length-1&&<p className="end-note">End of this revision · {exploration?`${exploration.processed_panels} instructions processed, ${exploration.reconstructed_panels} reconstructed. Remaining findings are retained for the next improvement pass.`:releaseAlpha?'Assembly details remain unverified. See the reported coverage in reconstruction details.':selectedSourceCovered ? 'All selected source pages are covered. Assembly details remain unverified.' : guide.expected_main_steps == null ? 'Full booklet coverage has not been verified.' : mainSteps===guide.expected_main_steps?'All expected main-step numbers are represented. Review status still applies.':'This is a partial reconstruction; remaining instructions require review.'}</p>}
         </aside>
       </div>
       <section id="panel-3D" role={phone?'tabpanel':'region'} aria-labelledby={phone?'tab-3D':undefined} className="model-pane" aria-label="Interactive 3D assembly"><div className="model-caption"><span><IconCube size={23} aria-hidden="true"/>{step.action==='build_subassembly'?'Build detached subassembly':step.action==='attach_subassembly'?'Attach the same subassembly':'3D assembly'}</span><span className="active-legend">{assemblyOverview?'Assembly overview':'Active pieces outlined'}</span></div>

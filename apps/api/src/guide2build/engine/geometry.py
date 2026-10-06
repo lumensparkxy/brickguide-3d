@@ -5,9 +5,12 @@ import json
 import math
 import shutil
 import sys
+import threading
 from pathlib import Path
 from ..catalog import ROOT
 from ..reconstruction.checks import verify_assets
+
+_RESOLVER_IMPORT_LOCK = threading.Lock()
 
 
 def verify_individual_assets(root: Path, geometry_refs: list[str]) -> dict:
@@ -44,7 +47,21 @@ def verify_individual_assets(root: Path, geometry_refs: list[str]) -> dict:
         "scope": "verified individual dependency closures and their union; not correctness of assembly"}
 
 
-def prepare_geometry(scene, directory: Path, shared: Path):
+def prepare_geometry(scene, directory: Path, shared: Path, *, accepted_scene=None,
+                     new_part_failure_profile="legacy", trial=None, publications=None):
+    if new_part_failure_profile != "legacy":
+        from .closure_publication import PROFILE, prepare
+        if new_part_failure_profile != PROFILE:
+            raise ValueError("Unknown new-part failure profile")
+        with _RESOLVER_IMPORT_LOCK:
+            spec = importlib.util.spec_from_file_location("guide2build_staged_fetch_parts", ROOT / "tools/fetch_parts.py")
+            resolver = importlib.util.module_from_spec(spec)
+            sys.path.insert(0, str(ROOT / "tools"))
+            try:
+                spec.loader.exec_module(resolver)
+            finally:
+                sys.path.pop(0)
+        return prepare(scene, accepted_scene, directory, shared, trial, publications, resolver)
     roots = sorted({instance.part_id for instance in scene.instances})
     if any(instance.geometry_ref != f"parts/{instance.part_id}.dat" for instance in scene.instances):
         raise ValueError("Physical instance geometry must be its individually resolved Part")
@@ -62,13 +79,17 @@ def prepare_geometry(scene, directory: Path, shared: Path):
         shutil.copyfile(shared / "provenance.json", directory / "provenance.json")
     retained = merge_verified_cache_receipts(directory, shared)
     # This module remains the existing single authoritative allowlist/classification boundary.
-    spec = importlib.util.spec_from_file_location("guide2build_local_fetch_parts", ROOT / "tools/fetch_parts.py")
-    resolver = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, str(ROOT / "tools"))
-    try:
-        spec.loader.exec_module(resolver)
-    finally:
-        sys.path.pop(0)
+    # Two independent-set workers may prepare private geometry concurrently.
+    # Serialize only the existing temporary import-path mutation, not downloads,
+    # checks or inference. Each worker still receives its own resolver object.
+    with _RESOLVER_IMPORT_LOCK:
+        spec = importlib.util.spec_from_file_location("guide2build_local_fetch_parts", ROOT / "tools/fetch_parts.py")
+        resolver = importlib.util.module_from_spec(spec)
+        sys.path.insert(0, str(ROOT / "tools"))
+        try:
+            spec.loader.exec_module(resolver)
+        finally:
+            sys.path.pop(0)
     # The resolver's 512-file/20-MB/depth limits apply to each individual
     # design closure. A complete set can contain many such designs without
     # turning the accumulated assembly into one unbounded download request.

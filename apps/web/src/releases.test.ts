@@ -35,6 +35,24 @@ describe('published release transport',()=>{
     expect(next.steps[2].introduced_instance_ids).toEqual([]);
   });
 
+  it('loads storage snapshots with fresh CORS cache keys while retaining checksum rejection',async()=>{
+    vi.stubGlobal('location',{origin:'https://portal.example'});
+    const {manifest,payloads}=await releaseFixture();
+    manifest.asset_base_url='https://storage.googleapis.com/synthetic-assets/synthetic-release/';
+    manifest.geometry_base_url=manifest.asset_base_url+'ldraw/';
+    const fetcher=vi.fn(async(url:URL)=>{
+      expect(url.search).toBe('?g2b-transport=2');
+      return new Response(payloads[Number(url.pathname.split('/').at(-1)!.split('.')[0])] as BodyInit);
+    });
+    vi.stubGlobal('fetch',fetcher);
+    const scene=await new ReleaseLoader(manifest).window(0);
+    expect(scene.steps[0].snapshot_loaded).toBe(true);
+    expect(scene.steps[0].poses).toEqual(fixture.steps[0].poses);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    vi.stubGlobal('fetch',async(url:URL)=>new Response(new Uint8Array(payloads[Number(url.pathname.split('/').at(-1)!.split('.')[0])].length)));
+    await expect(new ReleaseLoader(manifest).window(0)).rejects.toThrow('checksum');
+  });
+
   it('loads all callout siblings while keeping unloaded snapshot placeholders explicit',async()=>{
     vi.stubGlobal('location',{origin:'http://localhost:5173'});
     const {manifest,payloads}=await releaseFixture();
@@ -92,6 +110,17 @@ describe('published release transport',()=>{
     expect(scene).toMatchObject({set_number:'99999',status:'needs_review',physical_build_check:'not_run',reviews:[]});
     expect(scene.steps[2].introduced_instance_ids).toEqual([]);expect(scene.steps[2].poses).toEqual(fixture.steps[2].poses);
     expect(parseRelease(manifest)).not.toHaveProperty('alpha');
+  });
+  it('loads exploration provenance and rejects mixed generation labels',async()=>{
+    vi.stubGlobal('location',{origin:'http://localhost:5173'});
+    const {manifest}=await releaseFixture();
+    const alpha={artifact_kind:'exploration_candidate',generation_mode:'explore',source_coverage:'partial_reconstruction_unverified',
+      coverage_text:'Reported coverage (unverified): one instruction is unresolved.',uncertainty_notes:['Assembly needs source review.'],
+      accuracy:'unverified',human_review:'not_run',physical_build:'not_run'};
+    const input={...manifest,status:'needs_review',release_kind:'unverified_alpha',alpha};
+    expect(parseRelease(input).alpha).toEqual(alpha);
+    expect(()=>parseRelease({...input,alpha:{...alpha,generation_mode:'alpha_fast'}})).toThrow('alpha metadata');
+    expect(()=>parseRelease({...input,alpha:{...alpha,artifact_kind:'pdf_assisted_alpha_completion'}})).toThrow('alpha metadata');
   });
   it('rejects misleading alpha claims, unknown release kinds and unbounded disclosures',async()=>{
     vi.stubGlobal('location',{origin:'http://localhost:5173'});

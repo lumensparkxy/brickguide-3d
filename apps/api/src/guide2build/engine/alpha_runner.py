@@ -28,10 +28,10 @@ def alpha_runtime_choice(config, checkpoint):
     return AlphaRuntimeChoice.model_validate(value).model_dump(mode="json")
 
 
-def run_alpha_claimed(store, job, owner, provider=None, *, max_chunks=None):
+def run_alpha_claimed(store, job, owner, provider=None, *, max_chunks=None, stop_event=None):
     """Process only the already-claimed alpha job; never grant release approval."""
     from .alpha import generate_alpha
-    from .runner import Heartbeat, atomic_json
+    from .runner import Heartbeat, WorkerStopped, atomic_json
 
     checkpoint = job["checkpoint"]
     config = job["config"]
@@ -55,19 +55,24 @@ def run_alpha_claimed(store, job, owner, provider=None, *, max_chunks=None):
         if checkpoint.get("alpha_source_complete"):
             save("alpha_complete", "paused")
             return True
-        with Heartbeat(store, job["id"], owner) as heartbeat:
+        with Heartbeat(store, job["id"], owner, stop_event=stop_event) as heartbeat:
             heartbeat.check()
             continuation = None
             if job["set_number"] == "10316" and job["guide_id"] in {"booklet-02", "booklet-03"}:
                 predecessor = "booklet-01" if job["guide_id"] == "booklet-02" else "booklet-02"
-                prior = next((value for value in reversed(store.list())
+                prior_control = next((value for value in reversed(store.queue_snapshot())
                     if value["set_number"] == job["set_number"] and value["guide_id"] == predecessor
-                    and value["config"].get("generation_mode") == "alpha_fast"
-                    and value["config"].get("revision") == config.get("revision")), None)
-                if not prior or not prior["checkpoint"].get("alpha_source_complete") or prior["owner"]:
+                    and value["generation_mode"] == "alpha_fast"
+                    and value["revision"] == config.get("revision")), None)
+                if not prior_control or not prior_control["alpha_source_complete"] or prior_control["owner"]:
                     save("alpha_waiting_for_booklet", "blocked", {"code": "alpha_predecessor_required",
                         "message": f"Finish the unverified {predecessor} alpha source before carrying its parts forward."})
                     return True
+                # Hydrate and hash only the actual predecessor assembly. Other
+                # completed sets contribute no assembly evidence to this job.
+                prior = store.get(prior_control["id"])
+                if not prior["checkpoint"].get("alpha_source_complete") or prior["owner"]:
+                    raise ValueError("Alpha predecessor changed before continuation")
                 continuation = prior["checkpoint"].get("candidate")
                 if not continuation:
                     raise ValueError("Completed prior alpha booklet has no candidate")
@@ -144,6 +149,11 @@ def run_alpha_claimed(store, job, owner, provider=None, *, max_chunks=None):
         except (LeaseLost, InterruptedError):
             pass
         raise
+    except WorkerStopped as error:
+        try:
+            save("alpha_queue_stopped", "paused", {"code": "queue_stopped", "message": str(error)})
+        except (LeaseLost, InterruptedError):
+            pass
     except InterruptedError:
         try:
             save("alpha_cancelled", "cancelled")

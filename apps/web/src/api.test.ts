@@ -25,6 +25,19 @@ const second = {...first, job_id:'b'.repeat(32), guide_id:'alt-01', revision:nul
 const third = {...first, job_id:'c'.repeat(32), set_number:'60400', guide_id:'booklet-01', revision:'other-set'};
 
 describe('campaign preview identity and coverage', () => {
+  it('distinguishes source processing from available reconstruction in exploration', () => {
+    const exploration={processed_panels:3,reconstructed_panels:2,model_calls_used:7,max_model_calls:100,instructions:[
+      {ordinal:1,main_step_number:2,page_index:1,step_ids:[],reconstructed:false,finding_count:1,
+       findings:[{category:'source_view',message:'No renderable proposal.',instance_ids:[],step_ids:[]}]}]};
+    const preview=parseEnginePreviews({...first,generation_mode:'standard',execution_policy:'explore',exploration})[0];
+    expect(previewCoverageText(preview)).toContain('3 of 12 instructions processed · 2 reconstructed');
+    expect(preview.exploration?.instructions[0].reconstructed).toBe(false);
+    for(const bad of [{...exploration,reconstructed_panels:4},{...exploration,model_calls_used:-1},
+      {...exploration,instructions:[{...exploration.instructions[0],needs_recheck:'yes'}]},
+      {...exploration,instructions:[{...exploration.instructions[0],findings:[{message:123}]}]}]) {
+      expect(()=>parseEnginePreviews({...first,execution_policy:'explore',exploration:bad})).toThrow('Invalid exploration');
+    }
+  });
   it('supports a single preview and preserves separate campaign jobs', () => {
     expect(parseEnginePreviews(first)).toEqual([first]);
     const values = parseEnginePreviews({candidates:[first,second,third]});

@@ -3,9 +3,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawConditionalLineMaterial.js';
-import { approachFor, checkedApproach, type PlacementPlan } from '../placement';
+import { approachFor, checkedApproach, replayPlan, type ReplayPlan } from '../placement';
 import { createSourceCamera, inspectSourceCamera, moveCamera, stopCameraMotion, type CameraAction } from '../camera';
 import type { SceneManifest, StepSnapshot } from '../contracts';
+import { modelAssetUrl } from '../assets';
 // Explicit developer opt-in. No frame sampling or GPU queries run in the normal product path.
 interface RenderSample {
   atMs: number; phase: 'viewport' | 'thumbnail'; stepId: string; cpuSubmitMs: number;
@@ -79,13 +80,23 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
   const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
   useEffect(()=>{onReadyChange(!loading&&!error);},[loading,error,onReadyChange]);
   useEffect(()=>{ if(fullBuild) cameraCommand.current?.('reset'); else applyStep.current?.(false); },[fullBuild]);
-  useEffect(() => { const changedMainStep = frameKey(stepRef.current) !== frameKey(step); stepRef.current = step; applyStep.current?.(false); if(!playbackRef.current.fullBuild && changedMainStep) cameraCommand.current?.('reset'); }, [step, previous]);
+  useEffect(() => {
+    const changedStep = stepRef.current.step_id !== step.step_id;
+    const changedMainStep = frameKey(stepRef.current) !== frameKey(step);
+    stepRef.current = step;
+    if(!changedStep)return; // Loading adjacent chunks must not cancel this step's animation.
+    applyStep.current?.(false);
+    if(!playbackRef.current.fullBuild) {
+      if(changedMainStep)cameraCommand.current?.('reset');
+      applyStep.current?.(true);
+    }
+  }, [step, previous]);
   useEffect(() => { if (replayToken) applyStep.current?.(true); }, [replayToken]);
   useEffect(() => { cameraCommand.current?.(command.action); }, [command]);
   useEffect(() => {
     if (!host.current) return;
     let cancelled = false; let frame = 0; let dirty = true; let viewportVisible = true;
-    let tween: { elapsed: number; duration: number; from: Map<string, THREE.Vector3>; plan: PlacementPlan } | null = null;
+    let tween: { elapsed: number; duration: number; from: Map<string, THREE.Vector3>; plan: ReplayPlan } | null = null;
     setError(''); setLoading(true); const element = host.current;
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
@@ -150,11 +161,11 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     manager.setURLModifier(url => {
       const root = geometryBase;
       if (!url.startsWith(root) || url.includes('..') || url.includes('\\')) throw new Error('Unsafe part dependency');
-      const ref = url.slice(root.length); if (ref === 'LDConfig.ldr') return url;
+      const ref = url.slice(root.length); if (ref === 'LDConfig.ldr') return modelAssetUrl(url).href;
       const bare = ref.replace(/^(parts|p)\//, '');
       const resolved = resources[ref] ? ref : resources[bare] ? bare : fileMap[ref] ?? fileMap[bare];
       if (!resolved || !resources[resolved] || resolved.includes('..')) throw new Error(`Unregistered part dependency: ${ref}`);
-      return root + resolved;
+      return modelAssetUrl(root + resolved).href;
     });
     manager.onError = url => { failures.add(url); };
     const loader = new LDrawLoader(manager); loader.setConditionalLineMaterial(LDrawConditionalLineMaterial); loader.setPartsLibraryPath(geometryBase);
@@ -168,13 +179,17 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
         const key=frameKey(snapshot);const frame=mainStepFrames.get(key)??{bounds:new THREE.Box3(),parts:[]};frame.bounds.union(bounds);frame.parts.push(...parts);mainStepFrames.set(key,frame);
       }
       tween = null; setPlacementNote(''); const current = stepRef.current; const visible = new Set(current.visible_instance_ids); const active = new Set(current.active_instance_ids);
+      // Active IDs can include supporting pieces. Additions fly in only new pieces;
+      // an attachment moves the existing subassembly using the same physical IDs.
+      const movingIds = new Set(current.action==='attach_subassembly'?current.active_instance_ids:current.introduced_instance_ids);
       const showActiveOutlines = current.action !== 'inspect' || current.introduced_instance_ids.length > 0;
+      delete element.dataset.placementMode; delete element.dataset.placementReason; delete element.dataset.approachReason; delete element.dataset.animationInstanceIds;
       const from = new Map<string, THREE.Vector3>();
       for (const [id, group] of groups) {
         group.visible = visible.has(id); const pose = current.poses[id];
         if (pose) {
           group.position.fromArray(pose.position_ldu); group.quaternion.fromArray(pose.quaternion_xyzw);
-          if (animate && active.has(id) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          if (animate && showActiveOutlines && group.visible && movingIds.has(id) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
             from.set(id,group.position.clone());
           }
         }
@@ -185,15 +200,22 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       updateStage(mainStepFrames.get(frameKey(current))?.bounds ?? stageBounds);
       if (from.size) {
         const moving=[...from.keys()].map(id=>new THREE.Box3().setFromObject(groups.get(id)!));
-        const obstacles=[...groups].filter(([id,group])=>group.visible&&!active.has(id)).map(([,group])=>new THREE.Box3().setFromObject(group));
-        const plan=checkedApproach(approachFor(manifest,current),moving,obstacles);
-        if(plan.mode==='translate') for(const start of from.values())start.add(plan.offset);
+        const obstacles=[...groups].filter(([id,group])=>group.visible&&!from.has(id)).map(([,group])=>new THREE.Box3().setFromObject(group));
+        const approach=checkedApproach(approachFor(manifest,current),moving,obstacles);
+        const viewHeight=2*camera.position.distanceTo(controls.target)*Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+        const plan=replayPlan(approach,camera.quaternion,viewHeight);
+        if(plan.mode!=='highlight') for(const [id,start] of from) {
+          start.add(plan.offset); groups.get(id)!.position.copy(start); outlines.get(id)?.update();
+        }
         if(plan.mode==='highlight') for(const id of from.keys()) emphasis.get(id)!.visible = true;
-        setPlacementNote(plan.mode==='highlight' ? (plan.reason==='starting_pieces'?'Replay · start with the highlighted pieces.':'Replay · pieces shown in place. Follow the guide for attachment.') : plan.reason==='below'?'Attach from underneath.':'Attach from above.');
-        tween={elapsed:0,duration:playbackRef.current.fullBuild || plan.mode==='highlight'?1800:700,from,plan};
-        element.dataset.placementMode=plan.mode; element.dataset.placementReason=plan.reason;
+        setPlacementNote(plan.mode==='preview' ? 'Fly-in preview · follow the guide for attachment.' : plan.reason==='below'?'Attach from underneath.':'Attach from above.');
+        tween={elapsed:0,duration:playbackRef.current.fullBuild?1800:1000,from,plan};
+        element.dataset.placementMode=plan.mode; element.dataset.placementReason=plan.reason; element.dataset.approachReason=approach.reason;
+        element.dataset.animationInstanceIds=JSON.stringify([...from.keys()]);
+        renderer.shadowMap.needsUpdate=true;
       }
-      if(animate && !tween) { setPlacementNote('Replay · highlighted pieces shown in place. Motion is off.'); playbackRef.current.onAnimationComplete(); }
+      if(animate && !tween) { if(showActiveOutlines&&movingIds.size)setPlacementNote('Motion off · pieces shown in place.'); playbackRef.current.onAnimationComplete(); }
+      element.dataset.animationState=tween?(playbackRef.current.paused?'paused':'playing'):'idle';
     };
     let buildBounds: THREE.Box3 | null = null;
     const fit = () => {
@@ -230,13 +252,13 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
       const now=performance.now();const delta=now-lastFrame;lastFrame=now;
       if (tween && !playbackRef.current.paused) {
         dirty = true;
-        if (tween.plan.mode === 'translate') renderer.shadowMap.needsUpdate = true;
+        if (tween.plan.mode !== 'highlight') renderer.shadowMap.needsUpdate = true;
         tween.elapsed+=delta;
         const progress = Math.min(1,tween.elapsed/tween.duration); const t = 1-Math.pow(1-progress,3);
         emphasisMaterial.opacity = .08+.28*Math.pow(Math.sin(progress*Math.PI*2),2);
         for (const [id, start] of tween.from) {
           const group=groups.get(id)!;const pose=stepRef.current.poses[id];if(!pose)continue;
-          if(tween.plan.mode==='translate') group.position.lerpVectors(start,new THREE.Vector3().fromArray(pose.position_ldu),t);
+          if(tween.plan.mode!=='highlight') group.position.lerpVectors(start,new THREE.Vector3().fromArray(pose.position_ldu),t);
           const outline=outlines.get(id); if(outline){
             const material=outline.material as THREE.Material;
             material.transparent=true;
@@ -271,7 +293,7 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
     const onLost = (event: Event) => { event.preventDefault(); setError('The 3D graphics context was lost. Reopen the tutorial to restore the viewer.'); }; renderer.domElement.addEventListener('webglcontextlost',onLost);
     (async () => {
       if(benchmark)benchmark.audit.phases.assetLoadingStartMs=performance.now();
-      const provenanceResponse = await fetch(geometryBase+'provenance.json');
+      const provenanceResponse = await fetch(modelAssetUrl(geometryBase+'provenance.json'));
       if (!provenanceResponse.ok) throw new Error('Individual-part provenance catalogue is unavailable.');
       const provenance = await provenanceResponse.json();
       if (!provenance || typeof provenance.resources !== 'object') throw new Error('Invalid part provenance catalogue.');
@@ -352,7 +374,9 @@ export default function AssemblyViewport({ scene: manifest, step, previous, repl
         }
       }
       if(!buildBounds.isEmpty()){buildBounds.max.y+=60;buildBounds.min.y-=60;}
-      applyStep.current?.(); fit(); if (!cancelled) { if(benchmark)benchmark.audit.readyAtMs=performance.now(); setLoading(false); }
+      applyStep.current?.(); fit();
+      if(!playbackRef.current.fullBuild)applyStep.current?.(true);
+      if (!cancelled) { if(benchmark)benchmark.audit.readyAtMs=performance.now(); setLoading(false); }
     })().catch(e => { if (!cancelled) { assembly.visible = false; floor.visible = false; outlines.forEach(o => o.visible = false); dirty = true; setError(`Required geometry unavailable. ${e instanceof Error ? e.message : 'Asset error'}`); setLoading(false); } });
     return () => { cancelled = true; if(diagnosticScope.__guide2buildSourceCamera === sourceCameraControl) delete diagnosticScope.__guide2buildSourceCamera; cancelAnimationFrame(frame); resize.disconnect(); controls.removeEventListener('change',invalidate); document.removeEventListener('visibilitychange',invalidate); controls.dispose(); renderer.domElement.removeEventListener('webglcontextlost',onLost); geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); light.shadow.dispose(); benchmark?.dispose(); renderer.dispose();
       // Disposal frees Three.js resources; release the browser context as well

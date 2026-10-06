@@ -52,6 +52,13 @@ npm run test:e2e
 as frontend or E2E verification. The included Playwright tests mock network responses; add real-backend tests
 before claiming full integration. Optional external tests must be separately enabled and budgeted.
 
+For routine changes, `tools/check.py --quick` runs an explicit selection of 105 backend regression cases,
+schema drift, Ruff, frontend type checking and all frontend unit tests. It omits the full regression suite,
+production bundle and browser checks; its output labels that smaller scope. Combine `--quick --python-only`
+for a backend-only subset. The no-flag CI/release command stays full; `--quick --e2e` is rejected before startup.
+`npm run check` type-checks once through the build command, alongside all frontend tests and bundling.
+Neither test scope runs as part of reconstruction or saved-model playback.
+
 ## Job operations after M5
 Start the worker as a separate local process using the command implemented in that milestone. Add it to the
 dev runner only when its real lifecycle is available. Jobs persist in SQLite; worker restart resumes recorded

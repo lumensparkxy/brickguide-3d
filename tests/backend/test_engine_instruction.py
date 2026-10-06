@@ -57,6 +57,7 @@ def harness(tmp_path, monkeypatch, scene_data):
     monkeypatch.setattr(rendering, 'render_candidate', render)
     calls = []
     reviews = []
+    snapshot_stages = set()
     def infer(stage, prompt, images, model, heartbeat):
         calls.append((stage, prompt))
         if stage.startswith('construct'):
@@ -64,7 +65,7 @@ def harness(tmp_path, monkeypatch, scene_data):
         return model.model_validate(reviews.pop(0) if reviews else
                                     {'coverage_agrees': True, 'assembly_agrees': True, 'findings': []})
     def save(stage, state='constructing', error=None):
-        events.append((stage, state, error, deepcopy(checkpoint)))
+        events.append((stage, state, error, deepcopy(checkpoint) if stage in snapshot_stages else None))
     args = dict(job={'id': 'synthetic', 'set_number': '30669', 'guide_id': 'alt-02',
                      'config': {'max_panel_attempts': 2}}, previous=previous, ordinal=1,
                 panel={'number': 2}, page_index=0, page_count=8, source_hash=scene.source_sha256,
@@ -72,7 +73,8 @@ def harness(tmp_path, monkeypatch, scene_data):
                 images=[pages / 'page-000.png'], checkpoint=checkpoint, save=save, infer=infer,
                 heartbeat=SimpleNamespace(check=lambda: None), validate_candidate=validate_candidate,
                 atomic_json=atomic_json)
-    return SimpleNamespace(args=args, calls=calls, reviews=reviews, proposal=proposal, events=events)
+    return SimpleNamespace(args=args, calls=calls, reviews=reviews, proposal=proposal, events=events,
+                           snapshot_stages=snapshot_stages)
 
 
 @pytest.mark.parametrize('profile', ['strict', 'alpha'])
@@ -107,6 +109,7 @@ def test_exhausted_source_repairs_do_not_run_again(harness):
 
 def test_reviewed_last_attempt_recovers_without_new_model_calls(harness):
     h = harness
+    h.snapshot_stages.add('instruction_reviewed')
     h.args['job']['config']['max_panel_attempts'] = 1
     original_save = h.args['save']
     class Crash(BaseException):

@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 const softwareSpecs = [
   '**/booklet-preparation.spec.ts', '**/chunked-playback.spec.ts', '**/public-portal.spec.ts',
   '**/set-readiness-audit.spec.ts', '**/starter.spec.ts', '**/viewer.spec.ts', '**/public-alpha.spec.ts',
+  '**/exploration-preview.spec.ts',
 ];
 export default defineConfig({
   testDir: './tests/e2e',

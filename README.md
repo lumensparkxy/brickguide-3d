@@ -1,71 +1,118 @@
-# Guide2Build 3D — Version I
+# Guide2Build 3D
 
-**Set number → official instruction booklet → reconstructed assembly → interactive Three.js tutorial.**
+**Explore illustrated LEGO instructions as an interactive, step-by-step 3D assembly.**
 
-This local prototype retrieves official instructions, prepares durable jobs, and displays versioned
-PDF-assisted assembly candidates with individual LDraw geometry. Runtime automatic reconstruction is
-disabled. A candidate is not a verified build: see [current validation](docs/execution/VALIDATION_REPORT.md)
-for source coverage, outstanding geometry findings and actual test evidence.
+[Try the live alpha](https://guide2build-web-i2tso5lznq-ew.a.run.app/) ·
+[How reconstruction works](docs/03_RECONSTRUCTION_SPEC.md) ·
+[Engine guide](docs/execution/ENGINE.md) ·
+[Release status](docs/OPEN_SOURCE_RELEASE.md) · [MIT license](LICENSE)
 
-## Start in Codex
+Guide2Build combines a Python reconstruction engine with a React, TypeScript and Three.js
+viewer. The engine uses official instruction booklets and individual LDraw part geometry
+to propose parts, poses and subassemblies. The viewer lets you rotate, zoom, follow the
+instruction sequence and replay the pieces flying into place.
 
-Open this folder as the project root and paste the prompt in **[docs/prompts/BUILD_V1.md](docs/prompts/BUILD_V1.md)**.
-For a shorter launch, use:
+The public demo serves **13 saved alpha booklets across 10 sets**. It does not run a new
+AI reconstruction when you select a set. Automatic reconstruction is a separate, opt-in
+local CLI workflow. Saved authored references, automatic proposals and corrected results
+retain separate provenance.
 
-> Read AGENTS.md and docs/00_START_HERE.md, then execute docs/prompts/BUILD_V1.md end to end. Implement, test, and verify Version I. Continue beyond planning and the four-step checkpoint to the full selected booklet, unless a concrete blocker prevents it. Preserve source provenance and never claim automatic reconstruction or human verification without evidence.
+> **Working alpha.** Reconstruction errors and missing steps remain. Software tests,
+> attractive renders and completed processing do not prove attachment correctness or
+> physical buildability. Human review and physical assembly validation remain incomplete.
 
-[Start here](docs/00_START_HERE.md) · [Specification](docs/01_PRODUCT_SPEC.md) · [Architecture](docs/02_ARCHITECTURE.md) · [Current status](docs/14_SCAFFOLD_STATUS.md)
+## What is included
+
+- **3D viewer:** step navigation, camera controls, replay, full-build playback, phone layout
+  and reduced-motion support. Unverified fly-in paths are labelled visual previews.
+- **Reconstruction engine:** official-source indexing, individual-part lookup, model proposals,
+  deterministic checks, resumable jobs, corrections, source comparisons and explicit findings.
+- **Project context:** specifications, architecture, data contracts, agent instructions, skills,
+  tests and an implementation prompt. The specifications describe intended behavior; release
+  records describe what has actually been demonstrated.
+
+No completed community model is used as a reconstruction shortcut. Official PDFs, downloaded
+parts, private model calls, credentials and run databases are kept out of Git.
 
 ## Run locally
 
-Prerequisites: Python 3.11+, Node 22.12+ (or a compatible newer LTS), npm, and uv.
-Real dependency lockfiles are included. No system-wide package installation or API key is required.
+Requirements: Python 3.11+, Node.js 22.12+ (or a compatible newer LTS), npm and uv.
 
-```bash
+```sh
+git clone https://github.com/lumensparkxy/brickguide-3d.git
+cd brickguide-3d
 uv sync --extra dev
-npm install
+npm ci
 uv run python tools/doctor.py
-uv run python tools/prepare_reference.py  # first setup: official PDF + parts + labelled authored candidate
 uv run python tools/dev.py
 ```
 
-Frontend: http://127.0.0.1:5173 · API: http://127.0.0.1:8000/api/v1/health
-The launcher starts the API, SQLite worker and frontend on loopback; Ctrl-C stops all three.
-Enter **30669**, choose **Alternate aeroplane — booklet 02**, then prepare the official source or
-open the available candidate for review. Candidate warnings remain visible throughout navigation.
+Open http://127.0.0.1:5173. The API is at http://127.0.0.1:8000/api/v1/health.
+The launcher starts the local API, worker and frontend; Ctrl-C stops them. This setup
+requires no model API key and makes no paid inference calls automatically.
 
-The catalogue also includes official booklets for nine additional sets. **Prepare booklet** downloads
-and renders their source pages; it does not create the missing 3D assemblies. All 19 registered booklets
-across ten sets have passed local source preparation. See [source preparation limits and evidence](docs/execution/LARGE_SOURCE_PREPARATION.md).
+To prepare the initial **authored reference** for set 30669 / alternate booklet 02:
 
-```bash
-uv run python tools/check.py          # local unit/API/schema and frontend checks
-npm run test:e2e                      # install Playwright Chromium first
-uv run python tools/fetch_guide.py --set 30669 --guide alt-02
+```sh
+uv run python tools/prepare_reference.py
 ```
 
-Fetching requires external network access. Official PDFs and individual part assets remain in ignored
-`var/`; source images are not bundled with code. A fresh installation needs source and part preparation.
-`prepare_reference.py` performs this bounded download and recreates the shipped authored candidate,
-verifying source and every geometry dependency hash. It does not run a vision model. The worker never
-invents a missing reference or substitutes one for an automatic conversion.
+This explicitly downloads the allowlisted official booklet and individual part dependencies,
+checks their hashes and recreates the labelled reference. It does not run a vision model.
+The source files and parts are cached under ignored `var/` and retain their own terms.
+See [source and asset notices](THIRD_PARTY_NOTICES.md).
 
-For sandboxed Codex execution on this Mac, `uv` required approved execution outside the sandbox.
-Use `UV_CACHE_DIR=.cache/uv` to keep its download cache local. Once installed, `.venv/bin/python tools/dev.py`
-also starts the app; permission to bind local ports is still required in a restricted sandbox.
+## Run the reconstruction engine
 
-## Docs-only installation
+The local batch engine is separate from the default web worker and public demo. It requires
+your own authenticated Codex CLI, a model available to your account, and an explicit usage
+budget. It can incur model usage charges. Choose a bounded set/booklet job and follow the
+[engine runbook](docs/execution/ENGINE.md); use `tools/engine.py --help` to inspect commands.
+Do not treat a completed run as a verified reconstruction.
 
-Copy the supplied `docs/` directory into an empty repository. The same launch prompt works:
-it first runs `python3 docs/bootstrap/materialize.py` to create missing project files.
-The materializer never overwrites an existing file and reports conflicts. Reopen Codex after
-materialization when needed for newly created project-local agents/configuration to be discovered.
-The build can still proceed in the current session by reading the role and skill files explicitly.
+## Check the software
 
-## Boundaries
+```sh
+uv run python tools/check.py          # backend, schema, lint, frontend tests and build
+uv run python tools/check.py --quick  # selected development checks; not the release gate
+npx playwright install chromium
+npm run test:e2e -- --project=software
+```
 
-- First supported source: set 30669, official alternate booklet `30669_02_BI_Build_Alt.pdf`.
-- First geometry checkpoint: main steps 1–4. Final V1 target: all main steps in that booklet.
-- No PDF-upload requirement, RAG requirement, text-to-new-design, shopping, accounts or public hosting.
-- Local development only by default. Public hosting requires authentication, job isolation and a rights review.
-- Codex uses `.codex/config.toml`; `project.toml` is this repository's own project manifest.
+The software browser suite uses labelled synthetic fixtures and runs without downloading
+manuals or calling models. The separate `reference` project requires prepared source/parts.
+CI checks software behavior; it does not certify reconstruction accuracy.
+
+## Work with a coding agent
+
+Start with [AGENTS.md](AGENTS.md) and [docs/00_START_HERE.md](docs/00_START_HERE.md).
+The implementation contract is [docs/prompts/BUILD_V1.md](docs/prompts/BUILD_V1.md).
+Project roles and reusable skills are in `.codex/agents/` and `.agents/skills/`.
+Inspect the current release state before asking an agent to continue the original build plan.
+
+## Structure
+
+| Path | Purpose |
+|---|---|
+| `apps/web/` | React / TypeScript / Three.js viewer |
+| `apps/api/src/guide2build/` | Python API, source retrieval and reconstruction engine |
+| `packages/contracts/` | Schemas and labelled fixtures |
+| `config/` | Curated sources, individual parts and authored reference metadata |
+| `docs/` | Product specifications, runbooks and historical execution records |
+| `var/` | Ignored local sources, assets, jobs and evidence |
+
+Cloud deployment is optional and is not part of local setup. The deployment configuration
+contains example placeholders; configure your own resources and release authority before
+using cloud tools. Historical operational records and commit metadata may mention the
+maintainer's deployment; they do not grant access to it. No live model outputs or cloud
+credentials are supplied with the code.
+
+## License and contributing
+
+Original project code and documentation are [MIT licensed](LICENSE). Dependencies, fonts,
+source manuals and individual part assets retain their own licenses and notices. See
+[third-party notices](THIRD_PARTY_NOTICES.md), [contributing](CONTRIBUTING.md) and
+[security reporting](SECURITY.md).
+
+Independent prototype. Not affiliated with or endorsed by the LEGO Group.
+LEGO is a trademark of the LEGO Group.

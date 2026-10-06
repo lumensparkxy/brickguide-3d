@@ -30,7 +30,33 @@ export interface EnginePreview {
   completed_pages?: number; page_count?: number | null; source_coverage?: unknown;
   uncertainty_notes?: string[]; camera_alignment_check?: 'not_run' | 'measured_per_instruction';
   uncertainty_details?: unknown[]; artifact_kind?: string;
+  execution_policy?: 'strict' | 'explore'; exploration?: ExplorationStatus | null;
   repair?: {panel: number; attempt: number; limit: number}; error: {code?: string; message?: string} | null;
+}
+
+export interface ExplorationFinding {category: string; message: string; instance_ids: string[]; step_ids: string[];}
+export interface ExplorationInstruction {
+  ordinal: number; main_step_number: number | null; page_index: number; step_ids: string[];
+  reconstructed: boolean; needs_recheck?: boolean; finding_count: number; findings: ExplorationFinding[];
+}
+export interface ExplorationStatus {
+  processed_panels: number; reconstructed_panels: number; model_calls_used: number; max_model_calls: number;
+  instructions: ExplorationInstruction[];
+}
+
+export function parseExploration(value: unknown): ExplorationStatus {
+  const data=value as ExplorationStatus;
+  const count=(n:unknown)=>Number.isSafeInteger(n)&&(n as number)>=0;
+  const ids=(v:unknown)=>Array.isArray(v)&&v.length<=256&&v.every(x=>typeof x==='string'&&x.length<=160);
+  if(!data||![data.processed_panels,data.reconstructed_panels,data.model_calls_used,data.max_model_calls].every(count)
+    ||data.reconstructed_panels>data.processed_panels||!Array.isArray(data.instructions)||data.instructions.length>4096
+    ||data.instructions.some(i=>!i||!count(i.ordinal)||!count(i.page_index)||!(i.main_step_number===null||count(i.main_step_number)&&i.main_step_number>0)
+      ||!ids(i.step_ids)||typeof i.reconstructed!=='boolean'||!count(i.finding_count)||!Array.isArray(i.findings)||i.findings.length>64
+      ||(i.needs_recheck!==undefined&&typeof i.needs_recheck!=='boolean')
+      ||i.findings.some(f=>!f||typeof f.category!=='string'||f.category.length>100||typeof f.message!=='string'||f.message.length>2000||!ids(f.instance_ids)||!ids(f.step_ids)))) {
+    throw new Error('Invalid exploration diagnostics received.');
+  }
+  return data;
 }
 
 export function parseEnginePreviews(value: unknown): EnginePreview[] {
@@ -55,13 +81,15 @@ export function parseEnginePreviews(value: unknown): EnginePreview[] {
         || (preview.completed_pages !== undefined && !count(preview.completed_pages))
         || (preview.page_count !== undefined && preview.page_count !== null && !count(preview.page_count))
         || (preview.artifact_kind !== undefined && typeof preview.artifact_kind !== 'string')
+        || (preview.execution_policy !== undefined && !['strict','explore'].includes(preview.execution_policy))
         || (preview.uncertainty_details !== undefined && !Array.isArray(preview.uncertainty_details))
         || (preview.uncertainty_notes !== undefined && (!Array.isArray(preview.uncertainty_notes)
           || preview.uncertainty_notes.some(note => typeof note !== 'string')))) throw new Error('Invalid engine preview status received.');
     const identity = `${preview.set_number}:${preview.guide_id}`;
     if (identities.has(identity)) throw new Error('Duplicate engine preview guide received.');
     identities.add(identity);
-    return {...preview, ...(preview.image_quality ? {image_quality: parseImageQuality(preview.image_quality)} : {})};
+    return {...preview, ...(preview.image_quality ? {image_quality: parseImageQuality(preview.image_quality)} : {}),
+      ...(preview.exploration ? {exploration:parseExploration(preview.exploration)} : {})};
   });
 }
 
@@ -76,6 +104,10 @@ export function withPreviewAvailability(info: SetInfo, previews: EnginePreview[]
 }
 
 export function previewCoverageText(preview: EnginePreview): string {
+  if(preview.execution_policy==='explore'&&preview.exploration){
+    const e=preview.exploration;
+    return `${e.processed_panels} of ${preview.total_panels??'unknown'} instructions processed · ${e.reconstructed_panels} reconstructed · ${preview.step_count} snapshots · ${preview.instance_count} physical pieces`;
+  }
   const coverage = preview.generation_mode === 'alpha_fast'
     ? `${preview.completed_pages ?? 0} of ${preview.page_count ?? 'unknown'} source pages processed`
     : `${preview.completed_panels} of ${preview.total_panels ?? 'unknown'} source panels`;

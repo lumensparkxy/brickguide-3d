@@ -1,6 +1,180 @@
-# Execution checkpoint — 2 October 2026
+# MIT open-source publication — 6 October 2026
 
-## Current outcome
+Publish the tested production source with MIT, setup and contribution documentation,
+asset notices and placeholder cloud configuration. All 1,405 backend tests (3 skipped),
+54 frontend tests and 20 software browser tests pass. Original runtime code matches the
+production snapshot; duplicate generated output is excluded. Await hosted CI and public
+visibility readback. Private sources, assets, calls and credentials remain excluded.
+
+# Execution checkpoints
+
+## Reduce generation and local overhead — 4 October 2026 (complete)
+
+User requests cleanup of both generation overhead and local clutter. Inventory before
+changing anything; preserve saved models, official sources, live job/correction state,
+comparison evidence and unrelated work. Keep the generator model, inference ceilings,
+scene format and accuracy mechanisms unchanged.
+
+1. Measure repeated deterministic search/validation work and identify redundant local
+   services, generated caches and copied pre-test evidence.
+2. Remove redundant work through bounded, invocation-local reuse with unchanged outputs
+   and live file-change detection. Do not lower checks or omit candidate alternatives.
+3. Stop verified idle historical preview/worker services while retaining the current
+   preview and saved final model preview. Prefer transparent lossless compression of
+   cold evidence, retaining exact readable paths/hashes. Archive and hash-verify any
+   regenerable cache before removing it; retain restoration records. Keep whole copied
+   backup trees when their complete redundancy is not proven.
+4. Test output equivalence, source/geometry mutation detection and affected resume paths;
+   inspect the actual saved preview and report measured savings independently of LLM
+   generation time and model accuracy.
+
+Primary owns integration, process/cache cleanup, preservation and rendered verification.
+Workers audit search overhead and disk artifacts with disjoint responsibilities.
+Evidence destination: `var/evidence/overhead-cleanup-20261004/`.
+
+Implemented invocation-local verified catalogue reuse and cached public findings
+projections. Retained search output is identical, with local time about 2.09 → 0.99
+seconds and 107 → two catalogue verifications. Warm preview computation is 220.67 →
+1.25 ms with identical output. Lossless transparent compression saves 1,073,291,264
+allocated bytes across fifteen cold JSON files, preserving exact paths and readable
+hashes. Four idle services stopped; 4176 and 4179 remain available. All 161 checked
+saved-state files are unchanged. 912 backend tests, schema, Ruff, whitespace and the
+focused browser regression pass; the actual saved model and findings were inspected.
+No new inference or full-booklet runtime/accuracy measurement occurred. Remaining
+full-history diagnostic repetition and referenced E2E backups are reported separately
+in `OVERHEAD_CLEANUP.md`.
+
+## Apply measured accuracy improvements — 4 October 2026 (implementation complete)
+
+User explicitly requests implementation of the remaining experiment findings. Keep the
+same model and existing inference ceilings. Preserve all completed jobs, source evidence,
+saved 30669 revisions and production assets. This slice does not publish or start a new
+paid/full-booklet inference run.
+
+1. Derive bounded, localized and deduplicated repair/review feedback from the complete
+   findings archive. Prefer current-step and affected-group defects; preserve omissions,
+   unresolved cases and dependency uncertainty in durable receipts.
+2. Broaden connector receiving positions and orientations with bounded, diverse search.
+   Preserve rigid groups, the raw proposal and the 64-candidate / eight-alternative caps.
+3. Detect coincident whole-part geometry under symmetric rotations using verified individual
+   geometry. Keep bounds and nominal contacts diagnostic and avoid false whole-part matches.
+4. Index overview and detail regions explicitly, retain their source evidence, and distinguish
+   repeated depictions from fresh build events without silently discarding source panels.
+5. Integrate reusable feedback/source handling into exploration and the batch alpha path
+   without adding model calls in production or importing corrected/reference poses.
+6. Test resume/version fences, hard source/structure/resource limits and quality continuation;
+   replay frozen raw findings/proposals, inspect actual renders and record measured results.
+
+Primary owns exploration/alpha integration, version fences, immutable-evidence checks,
+render/browser verification and the final report. Parallel workers own disjoint feedback,
+hypothesis/geometry and source-index modules/tests. Software and frozen-replay results will
+be reported separately from fresh autonomous accuracy, human review and physical build.
+Evidence destination: `var/evidence/engine-accuracy-improvements-20261004/`.
+
+Implemented all six slices. Offline repair feedback is 76.65% smaller and retains
+all baseline current visible defects and deterministic contract findings, with
+explicit omission counts. Two raw searches reach four receiver sites instead of
+one while retaining 64 evaluations, eight alternatives and three distinct render
+scenes. Symmetry diagnosis identifies the retained failed revision's rotated
+duplicate bases/strips. Semantic source routing, alpha reuse and authenticated
+correction seeds are integrated. All 889 backend tests, 52 frontend tests, schema,
+Ruff, typecheck/build and the focused browser regression pass. Inspected 12 real
+candidate images and the saved model's findings preview. All 5,277 original pinned
+files are unchanged. Fresh autonomous accuracy/runtime improvement is unmeasured;
+no new inference or publication occurred. See `ENGINE_ACCURACY_IMPROVEMENTS.md`.
+
+## Fixed-model accuracy experiments — 4 October 2026 (complete)
+
+User approved the recommended measured sequence and explicitly excluded other models.
+Keep `gpt-6-astra` / `high`, exploration policy, source evidence and a 100-call ceiling
+fixed for each full run. Production continues serving saved scenes; no publication is included.
+
+1. Freeze the current v3 implementation and existing job evidence; run a fresh, unaided
+   complete 30669 / alt-02 baseline from that snapshot, with fresh source indexing.
+2. Evaluate source-supported quantities, identities, colours and relationships, preserve
+   every source/render comparison, and inspect the final assembly and recorded failures.
+3. Test one opt-in, generic attachment-prompt improvement against the frozen baseline:
+   complete rigid groups and source-supported attachment alternatives. Keep solver,
+   geometry, image policy, model, reasoning and attempt limits unchanged. Reuse the baseline's
+   authenticated automatic source index as a shared experimental input, charging its eight
+   calls to both run budgets. This removes source-index sampling variation; no assembly or
+   correction is inherited. Report shared-index assembly comparisons separately from fresh
+   end-to-end runs. The baseline's fresh index has 14 panels versus the earlier run's 13.
+4. Compare raw outputs before any assisted corrections. Repeat or broaden only when
+   measured findings justify it; identify a suitable held-out official booklet for a
+   generalization check. Do not claim improvement from one attractive render or warnings alone.
+5. Test profile/version isolation and existing behavior, inspect actual previews, record
+   runtime/calls and immutable evidence, then update the execution ledger and report.
+
+Primary owns frozen execution, profile integration, run operation and final acceptance.
+One worker owns only the generic attachment-prompt module/tests; one prepares independent
+source scoring. Existing source-reviewed annotations and historical candidates stay out of
+generator input. Evidence: `var/evidence/fixed-model-30669-20261004/`.
+
+Raw comparison complete: both runs represent all 16 semantic source events and
+32 pieces. The unchanged source rubric is 9/0/1 pass/fail/unknown for control and
+7/2/1 for the prompt challenger. The latter removes undeclared historical movement
+but introduces one correlated central-body offset spanning two criteria. Keep the
+default unchanged. Both raw jobs, all 38 comparison cards and four inspection
+views per job are preserved and independently verified. Investigate a source-bound
+correction of the earlier attachment branch before any new full-run mechanism;
+preserve the 100-call lineage ceiling and label any corrected result assisted.
+
+Correction-control slice: the current restart supplies only the first two suffix
+pages as later-view images. Allow an explicit, evidence-bound choice of two source
+context pages and an optional reduction of the inherited attempt cap. This permits
+a restart at the uncertain earlier attachment to inspect the actual later body
+views within the remaining budget. Defaults, parent evidence and the total call
+ceiling stay unchanged. A worker owns only correction controls and focused tests;
+primary reviews and freezes any correction runner separately from the raw pair.
+
+First assisted restart complete: 14 panels processed, 11 reconstructed, 17 snapshots,
+32 pieces, 21 new model calls and 81/100 calls charged to the lineage. Source review
+is 8/1/1 relationships and 28/3/1 clauses: central body/roof regressions are repaired,
+but both wing modules now overlap on the near arm. The relationship count alone is
+not evidence of overall improvement. Frozen raw outputs and this revision remain intact.
+
+Second and final assisted correction complete: corrected the independently
+source-reviewed main-3 tile end/orientation and moved its complete three-piece
+module to the printed far arm. The replay changes 31 poses in 11 snapshots and
+preserves 197 others. The immutable revision uses zero new inference, stays at
+81/100 calls, and reaches 9/0/1 source relationships and 31/0/1 clauses. All 17
+snapshots and four final views were inspected. The initial sandbox-denied render
+was retained, followed by a successful full comparison render in a separate output.
+Raw prompt improvement is rejected; this is assisted recovery with specific defects
+repaired. Exact hidden seating and physical assembly remain unverified. The report
+and ranked remaining issues are in `FIXED_MODEL_ACCURACY.md`; the next separate
+mechanism is localized, deduplicated repair feedback, followed by receiver diversity.
+
+## Complete-booklet accuracy iteration — 4 October 2026 (first iteration complete)
+
+User approved implementing exploration runs that finish the booklet while retaining quality findings, then improve source-derived part choices, placement hypotheses and visual correspondence through bounded corrections. Initial target: 30669 / alt-02. Production assets are frozen comparison evidence, not generator input or independently verified truth.
+
+- Primary: integration, CLI, preview findings, baseline freeze, live full-booklet experiment, browser inspection and final evidence.
+- Execution worker: separate `explore` policy, at most two proposal attempts per instruction, persisted processed/reconstructed counters, provisional receipts and continuation after quality failures. Strict behavior remains intact.
+- Reconstruction worker: source-relevant part observations/crops, bounded candidate geometry/connector alternatives (64 candidates, beam 8), camera correspondence alternatives and deterministic diagnostics.
+- Evaluation worker: source-scorable evaluation, immutable correction forks, descendant replay, two-pass correction lineage and shared finite inference budget.
+- Preserve source/geometry hashes, schema validity and resource limits. Poor fits, unsupported contacts, overlaps and visual discrepancies remain visible findings rather than whole-booklet stops. No placeholder bricks or false approval.
+- Freeze the current 30669 candidate and retained failure receipts. Run a fresh source-only experiment with the existing provider, then at most two targeted correction passes. Compare raw and corrected results and retain any unresolved defects.
+- Test negative and resume/recovery cases, run actual Three.js/source comparisons and inspect the local preview at desktop/phone sizes. Record exact commands, call usage, source coverage and limitations in the execution ledger. No production publication is included.
+
+Current implementation and live evidence are recorded in
+[`ACCURACY_ITERATION.md`](ACCURACY_ITERATION.md). The older dated checkpoints below
+are retained history; their former provider and gate limitations are not current status.
+
+Completed: the unaided pass is frozen with 13/13 indexed panels, 18 snapshots and 32
+physical pieces. One source-derived correction revision repairs wing mounts, corner-tile
+pose and attachment groups; all snapshots were exercised in both previews. Source-relationship
+checks improve from 8/1/1 to 9/0/1 pass/fail/unknown; fixed-camera main 3 silhouette overlap
+improves from 0.7583 to 0.9259. Independent selection/segmentation/contact replays and
+recovery fixes are integrated. Final verification: 637 backend tests, 52 frontend tests,
+typecheck/build, schema/lint and targeted browser checks pass. The original 1,067 files and
+142 corrected-job files remain unchanged. Eight localized nominal connector conflicts remain;
+production-alpha superiority and physical correctness are not established. Next accuracy
+iteration should inspect the main 5/6 lower-body/wing contacts and test complete-group
+underside placement alternatives with a fixed provider/budget.
+
+## Historical prototype outcome — 2 October 2026
 Implemented and ran the local prototype. Set 30669 / alt-02 has a source-backed, corrected,
 PDF-assisted candidate covering 12 main steps, 16 microsteps and 32 physical pieces.
 Full Version I acceptance is blocked by unresolved geometry/connector/source ambiguity and the
@@ -27,7 +201,7 @@ unconfigured automatic provider. No human or physical verification has occurred.
   audited source/parts/UI code outside their ownership; primary integrated fixes and checked actual runtime.
 - No Git metadata exists, so no commit/branch/issue IDs are invented.
 
-## Next executable action
+## Historical next action — 2 October 2026
 Open the existing v3 candidate and its review findings. Review the saved official panel comparisons, complete
 supported connector metadata and narrow-phase geometry checks, and resolve canopy tint/part variants/tail
 centering with actual evidence. Apply corrections as new revisions. Preserve source ambiguity if it cannot be
@@ -533,3 +707,279 @@ Temporary verification tags and the owned 4186 inspection server are removed, wi
 all frozen data and the requested 4175 preview retained. Save the evidence ledger and push its final
 documentation/verification-tool checkpoint; application inputs still match deployed commit `88e27ea`.
 Accuracy, human assembly review and physical build remain unverified or not run.
+
+## Repair production alpha model opening — 4 October 2026
+Reproduced the user's `Let’s try again / Failed to fetch` on the public Cloud Run
+project-number URL. The same plane alpha opens on the service's hashed URL. The
+retained asset CORS configuration lists only the hashed public/preview origins.
+Verify the current service URL metadata, bucket configuration and response headers
+before mutation. Preserve the prior bucket CORS configuration for rollback.
+
+Update the deployment tool to obtain every actual public/preview origin from Cloud
+Run service metadata, including verification tags, and configure the existing
+public asset bucket before checking a revision or shifting traffic. Add regression
+checks for both hostname formats, tag URLs, malformed metadata and readback. Apply
+only the missing-origin correction to the already public asset bucket; retain exact
+release hashes, assets, private route protections and Cloud Run revisions. Verify
+real model opening and first/final instruction navigation on both production URLs,
+with desktop and phone captures. Record current evidence in
+`var/evidence/alpha-fetch-repair/`, the validation report and progress ledger.
+
+The live CORS correction is verified, but the original asset URL still returns a
+cached response without the new permission header (`Age` over 1000 seconds and
+one-year immutable caching). A stable `?g2b-transport=2` URL returns the correct
+header for the same actual object generation. Extend the repair to version public
+storage requests for scene chunks, provenance, materials and every nested individual
+part dependency. Preserve checksum validation and same-origin local behaviour.
+Complete local tests and actual browser verification of this client before seeking
+the separate production deployment authorization required by the build contract.
+
+Completion checkpoint: the user approved the tested deployment. Application commit
+`29c7afef9e7dac9d8a34fa6642520f3443c9ecb7` passed 490 backend tests, 51 frontend
+tests and six focused browser regressions. Cloud Build
+`2063b640-0c63-41f5-8b65-9372502cd881` succeeded, and public revision
+`guide2build-web-00012-pej` serves 100% traffic. All 13 published models opened
+with their exact existing release hashes at the previously failing project-number
+URL; their first/final instructions, plane/Rivendell phone views and privacy
+boundaries passed live checks. Direct browser inspection also verified the plane
+first/final instructions on both production aliases, at desktop and phone sizes.
+Only the owned verification tag was removed; the four active service origins,
+unchanged image and traffic were read back. Existing rollback revisions and local
+preview files remain. The separate 4175 preview has no listener at the final check;
+this repair did not start or stop it. This incident is resolved; assembly accuracy,
+human review and physical build retain their existing unverified or `not_run` status.
+
+## Engine efficiency implementation — 4 October 2026
+
+User-authorized scope: implement actionable repair selection, smaller source-grounded assembly
+context, incremental deterministic checks, lightweight durable checkpoints and a bounded queue
+for independent sets. Keep the model `gpt-6-astra` / `high`, all saved models, immutable trials,
+source-integrity/resource checks and strict verification behaviour. Do not run new inference,
+publish changes or restart the local web applications for this implementation.
+
+- Inspect current engine, store and campaign interfaces; record pre-change source/model pins.
+- Worker A owns exploration repair selection and compact assembly context with focused tests.
+- Worker B owns incremental hypothesis diagnostics and invalidation/equivalence tests.
+- Worker C owns immutable candidate checkpoint artifacts and bounded store claims with tests.
+- Primary owns CLI/independent-set scheduling, integration, evidence, ledger and final review.
+- Version new prompt/repair choices explicitly; legacy frozen jobs retain their original policy.
+- Test diagnostic findings versus actionable repairs, context boundaries, unchanged-prefix reuse,
+  correction invalidation, checkpoint tampering/resume, queue bounds and duplicate-set exclusion.
+- Replay retained local trials without inference to measure request/checkpoint sizes and deterministic
+  results. Run applicable backend/schema checks; report synthetic/replay evidence separately from
+  a fresh full-booklet speed or accuracy comparison, which remains unmeasured.
+
+Completion checkpoint: all five changes are implemented. The final full local check passed 1,043
+backend tests, 52 frontend tests, schema, Ruff, TypeScript and build; independent context/repair
+review passed 119 tests. Exact nested-group and unnumbered-attachment reproductions exposed and
+resolved unnecessary or incomplete repairs. Final retained replay measures 24.68% smaller assembly
+input, 0.535% smaller complete initial prompts and 11.9% faster local main-4 search with identical
+diagnostics. Synthetic SQL row payload falls over 99.8% while immutable candidate files remain.
+All 40 pinned saved scenes/sources and all 24 live job rows retain their prior hashes; app ports
+remain closed. No new inference, browser/server start, historical evidence replacement or publication.
+Record final pins and receipts under `var/evidence/engine-efficiency-20261004/`; use the next separately
+authorized fresh run to measure end-to-end speed and reconstruction accuracy.
+
+## Test-suite optimization — 4 October 2026
+
+The user requested leaner tests and fewer routine checks. Audit exact collected cases and timings,
+then consolidate genuine repeated workflow assertions, remove unused checkpoint copies in synthetic
+fixtures and avoid database/source/geometry setup for pure input-validation/scoring tests. Retain all
+distinct input variants, source/corruption/resume/correction assertions and full CI/release checks.
+Add an explicit small `tools/check.py --quick` scope for routine work; no-flag checks remain full and
+quick checks cannot be confused with a full validation run. Remove the duplicate TypeScript pass
+inside `npm run check` while retaining type checking and build. Do not change engine/provider/scene
+logic, install dependencies, run inference, start local web apps or rewrite historical evidence.
+
+Worker A owns exploration/alpha/instruction test fixtures and repeated prompt-contract assertions;
+worker C owns correction-control/evaluation test setup. Primary owns check scope, package scripts,
+integration, timings and documentation. Preserve before/after outputs and semantic mappings under
+`var/evidence/test-suite-optimization-20261004/`; run focused checks, then one full final regression.
+
+Completion checkpoint: quick scope passes 105 unique backend cases plus all 52 frontend tests and
+TypeScript; the first quick backend run takes 3.31 seconds and independent backend-only verification
+takes 1.75 seconds. All quick cases are a unique subset of the full suite. The final no-flag check passes
+1,041 backend cases in 28.06 seconds, all 52 frontend tests, schema, Ruff, TypeScript and build. Two
+standalone prompt-contract cases are consolidated with all assertions retained; other input variants and
+recovery tests remain. Before/final timings are observed single runs. Forty saved scene/source files,
+24 live job rows and 14 engine/command files preserve their hashes; local web apps remain stopped.
+
+
+## Preserve prior models and stage the next-nine rerun — 5 October 2026
+
+The user authorizes the staged rerun and explicitly requires the saved red aeroplane and all prior work to remain. Root owns integration and new-job execution. Use a separate data root under `var/experiments/next-nine-20261005/` and fresh revisions; never resume, replace, migrate, clear or publish the old completed campaign. Before inference, snapshot/hash the existing saved scenes, source receipts, job evidence and logical job records; create a verified recovery copy of critical scenes and SQLite job records. All previous source/render/correction evidence remains in its original location.
+
+1. Preflight current tested code and subscription-authenticated provider. Reuse only verified official source bytes and individual part/primitive resources in the new generator workspace; old assembly poses and evaluation annotations are excluded.
+2. Generate 60400/booklet-01 with `gpt-6-astra`, `high`, `explore`, `incremental-v1`, one proposal plus at most one targeted repair, 64 placements / eight alternatives / three render candidates. Freeze a 300-call booklet budget before the first call, including indexing, comparison and any subsequent correction. Quality findings remain diagnostic.
+3. Source-review and inspect the complete first result with source/render comparisons, defect ranking and runtime/model-call counts. Preserve raw output independently of any correction. New review annotations remain outside generator input.
+4. Expand to a larger booklet only after inspecting the first run; at most two independent sets may execute concurrently. Size later budgets before enqueueing. Retain operational/source/resource blockers and continue independent assessment; do not manufacture completion or publish a candidate.
+5. Verify all earlier scene/source/evidence/job-record hashes after execution. Update progress and validation with actual results. Local web apps remain stopped; engine-internal temporary rendering may run on loopback and must close afterward. Human review and physical build remain `not_run`.
+
+Evidence root: `var/evidence/next-nine-20261005/`. New run root: `var/experiments/next-nine-20261005/`. This is an authorized generation/inspection task, not a production deployment.
+
+### First transfer-run asset blocker and preserved correction — 5 October 2026
+
+The unaided 60400 run stopped at 20/28 processed/reconstructed events and 85 model-call reservations: proposed 3829 follows a dependency to `parts/3829c01.dat`, classified Shortcut and rejected by the individual-part allowlist. Preserve the raw blocked job, its scene, captured proposal and failed trial. Do not broaden the allowlist or silently replace its inference result. Freeze its files and evaluate it as incomplete.
+
+Use the existing `fork-correction` mechanism to create a separate agent-assisted revision restarting at vehicle main 18. The cached official individual stand `3829a` and wheel `3828` are approved Parts with retained notices/closure provenance; reuse only these individual resources, never prior assembly poses or an LDraw Shortcut transform. Stage those verified closures solely in the new child's private geometry. Bind corrective guidance to official source page 22 and the later final seated-driver view on page 29. Preserve source order and existing driver/wheel identities; any final-state view must have no invented main 24. Keep gpt-6-astra/high, the current engine policy, at most two attempts and the shared 300-call ceiling including the 85 inherited calls. The original is an incomplete unaided output; the full child is assisted. Root owns the fork/run and integration. Expand to the larger staged booklet only after inspecting the first complete result.
+
+The first correction attempt was rejected because correction admission treats the retained fatal/no-output cover-index fallback differently from normal resumed exploration. Add an explicit bounded agent source-only acknowledgement for this recovered `provider_unavailable` case. It must bind the exact existing empty V2 index, failed request/receipt and verified page pixels; keep the index, normalized event queue, cursor and every historical file unchanged. Omitted/forged acknowledgement, nonempty indexes and integrity/auth/quota failures still reject. The child remains assisted and uncertain; runtime, provider pause, shared call ceiling, SceneV2/source/provider schemas and individual-Part allowlist stay intact. Delegate only `engine/corrections.py` and focused existing correction regression tests to the independent reviewer; root owns request/evidence/cache staging, integration and job execution. Run focused meaningful regressions, then continue the isolated corrected booklet and inspect its actual renders.
+
+Recovery checkpoint: the bounded acknowledgement implementation passes 122 focused correction cases
+and Ruff. Child `48869f5c99ea435098a307046cc3e08c` retains the exact source-index seed,
+the first 20 events and 85 inherited calls; the original raw job remains blocked and untouched.
+Only approved individual 3829a/3828 dependency closures were staged in the child's geometry.
+Actual instruction-18 images show these parts rendering and a wheel orientation defect, which
+triggered a localized single repair. Full historical verification after the fork still passes
+all 14,535 files and both old logical databases. The intentional source change is recorded
+separately from the original engine pins. Continue to the end before claiming a complete result.
+
+### Source-event prompt accuracy follow-up — 5 October 2026
+
+Retained wheel evidence establishes a concrete prompt conflict: event 0025 requests an uncertain
+unnumbered thumbnail, but the baseline wording asks for the main instruction and all callouts.
+Its candidate consumes neighbouring event 0026's printed main 23 and both local callouts, adds
+eight snapshots, duplicates a sequence header and maps detached callouts to the wrong action.
+The attempted repair then fails SceneDelta validation on a malformed source hash. Preserve these
+actual trials; neither their sequence finding nor visual agreement establishes corrected scope.
+
+Finish and freeze the currently running assisted 60400 child before editing engine code. Independently
+score its full source-visible relationships and quantities against the already frozen historical rubric.
+Then implement one opt-in `event-scoped` proposal profile (`event-scope-v1`) for fresh configurations.
+Its scope is exactly the requested panel and explicitly listed required callouts; uncertain non-action
+regions may return null with a source-bound blocker and continue to the next event. Explain the existing
+one-record-per-snapshot sequence/action/group contract and discourage quantity-derived microsteps.
+Preserve baseline/attachment prompt bytes, queue/grouping behavior, source integrity, renderer, solver,
+AI model, repair limits and all saved evidence. Hash the complete new profile wording into the policy
+so a resumed run cannot silently acquire new prompts. This is proposal guidance, not a stronger gate.
+
+The independent reviewer owns the new event-scope prompt module, minimal exploration/profile dispatch
+and focused scope/resume regressions. Root owns the CLI option, integration, source pins, documentation,
+new-job execution and inspection. Do not implement the separately diagnosed typed new-design rejection
+boundary or camera-policy changes in this slice. Record larger-run input/budget/profile pins before its
+first call. Larger source annotations remain evaluator-only. Comparing different sets or historical
+reasoning settings cannot isolate the prompt change's causal effect.
+
+### Independent second-car booklet — 5 October 2026
+
+While the 31134 pilot continues, run the independent 60400/booklet-02 with the same frozen
+event-scoped engine, gpt-6-astra/high, explore/incremental-v1, two attempts per event and a
+300-call lineage ceiling. Keep at most these two independent sets active. Use a separate
+`var/experiments/next-nine-20261005/car-02-data/` root so adding already authenticated
+individual 3829a/3828 geometry cannot change the active shuttle's catalogue. Clone only verified
+generic individual geometry, notices and official booklet bytes; copy no prior poses, assembly
+scenes or evaluation annotations. Freeze these inputs before the first call. Source-only
+booklet-02 annotations are complete and remain evaluator-only. Inspect and freeze the actual
+complete output or a specific blocker, with unaided and assisted revisions distinguished.
+
+### Localized review preparation while pilots run — 5 October 2026
+
+The saved second-car head repair visibly improves the head position but is not selected.
+Independent replay establishes that omitted physical instance metadata leaves two placement
+defects unlocalized; their identical grouping key lets the hand overwrite the head. Prepare
+a concrete, opt-in version-bound review/context and distinct-observation fix in ignored
+`var/evidence/next-nine-20261005/localized-review-draft-01/` only. The reviewer owns that
+draft directory; root owns integration. Do not alter the frozen engine or generator inputs
+until both active pilots complete or stop at a recorded blocker. Preserve old profile
+semantics, parent/resume bindings, inference ceilings and every actual trial. A labelled
+counterfactual selection replay is mechanism evidence, not measured model improvement.
+
+### Inactive shuttle recovery and inspected car result — 5 October 2026
+
+The fresh second car is frozen: 32 events processed, 31 reconstructed, 124 calls;
+12/20 frozen source relationship clauses pass versus 15/20 in the historical assisted
+candidate. These unequal clauses are not overall accuracy percentages. A separate
+zero-call head correction changes only 27 dependent head poses and retains the raw
+result. Finish the shuttle before expanding generation; do not claim a general gain.
+
+The shuttle stopped after 45/58 events and 182 calls at the unchanged catalogue
+identity fence. Preserve its exact row, scene, trials and source before normal resume.
+Some evidence reads encounter macOS dataless files. Use bounded, read-only local
+prefetch and deterministic replay to authenticate the recorded proposal and geometry;
+record byte hashes and metadata transitions without attributing the past failure to
+an unobserved cause. Never weaken the integrity check or reset calls/evidence.
+Keep staged review and new-design fixes private until independent regressions pass.
+
+
+### Lossless source-cache resume recovery — 5 October 2026
+
+The authenticated shuttle resume stopped before a new model call with `PDF rendering exceeded batch time limit`. Inspection establishes that `render_pages` launches whole-document preflight before inspecting its resume cache, even when exploration already binds every source PNG to its immutable checkpoint. The generic timeout and discarded worker diagnostics cannot establish the failed phase.
+
+Freeze the read-only source audit first. Prepare the smallest private source-cache patch for a caller-supplied, trusted checkpoint proof: require the same verified PDF bytes, complete ordered page coverage, matching renderer parameters/cache metadata, bounded verified PNG hashes/dimensions and current resource limits before avoiding repeated preflight. Fresh/partial/untrusted/mismatched inputs retain ordinary validation or fail closed. Preserve exact page bytes, source mappings, provider requests, assembly poses, budget and existing saved models. Worker owns only source rendering, runner dispatch and focused source-cache regressions in a new private package; root owns integration and real resume. Independent review is required before integration. This is deterministic repeat-work removal, not a model-accuracy mechanism.
+
+
+### Scoped integration while the shuttle is inactive — 5 October 2026
+
+Integrate the checkpoint-bound source-cache path only after independent review and exact base-pin checks. Also stage the independently reviewed localized-source-v4 and narrow repaired new-design-rejection-v2 opt-in patches for a combined integration check while no reconstruction owns a job. Root owns overlapping exploration/store/correction/CLI edits and keeps the three patch origins separate. New profile controls must preserve absent-profile request bytes and historical policy bindings; the paused shuttle retains its original proposal/review policy and shared 600-call budget. The source cache change returns the same authenticated page records/pixels and does not count as an accuracy change.
+
+Keep private draft v1/v2/v3/v4, their counterexamples and manifests unchanged. Record new engine source pins, focused composed-profile/correction/resume/resource regressions, Ruff and schema drift before retry. Do not change active engine code once the shuttle is running. Resume the same job without resetting reservations, source mappings or the failed trials; freeze and inspect its entire completed result or a specific retained blocker. All older job databases remain read-only. An attempted fresh full historical rehash stalled on an old individual part read and was terminated without writes; the last complete historical verification and the later exact red-aeroplane primary/archive checks remain separately reported.
+
+
+Cache-only integration checkpoint: the v2 source/runner patch is applied after 104 independent checks, 121 active checks, Ruff and unchanged contracts. The fresh-PDF native test remains unverified after a private worker stall. Real source replay matches all 60 pages, 62 source files, the exact scene and SQL row in 0.099 seconds with no workers or new model calls. Thirty noncanonical copy filenames blocked strict coverage; they were preserved by same-filesystem rename with unchanged inode/mode/size. Their bytes were not separately verified. The first stalled archive attempt remains labelled unfinished. All canonical pixels and model files stay intact. Continue the same job from 45/58 and 182 calls; the original 37 engine pins remain beside the intentional 38-file cache-fix pins. Accuracy profiles remain unapplied for this raw pass.
+
+
+### Recover unavailable historical trial files without changing their evidence
+
+The cache-fixed retry is progressing through authenticated historical trial recovery, but local reads continue to take minutes before any additional model call. A metadata inventory identifies dataless live files whose verified interrupted-freeze counterparts remain locally readable. Stop the owned queue gracefully and wait for the lease to release before restoring availability. Root owns recovery: authenticate each frozen copy against its original manifest, retain each original file object by same-filesystem rename, then publish an exact copied replacement at its original logical path. Record old object identities, known and unknown byte-verification status, replacement hashes, the unchanged candidate and call count. Do not delete originals, repair mismatched backup bytes, reset attempts, weaken evidence fences or edit active code while a worker owns the job. Restore only the current pilot’s frozen immutable evidence, not older completed jobs or source pixels. Resume the same checkpoint and inspect the completed booklet.
+
+
+### Restore the compiled preview after a proved short read
+
+The retained candidate renderer failed with React #306 and viewer-ready timeout. A direct Node probe returned zero bytes for the 591,628-byte dataless ViewerWorkspace bundle; no inference call followed. Preserve the entire old compiled dist by same-filesystem rename, pin source/contracts/package inputs, rebuild locally from the same source and verify the new compiled payloads plus actual candidate browser output. Keep failed report/log and source-camera evidence intact in an explicit retained failure location so the existing bounded render retry can use a fresh slot. Root owns recovery and engine integration while no job has an owner. No source scene, brick pose, provider, budget, production deployment or saved model is changed.
+
+The first rebuild exposed full-package icon traversal: three components import a barrel with 6,221 icons. Prepare direct imports of the 16 icons actually used, preserving vendor component types, refs, SVG data and notices. Add a small renderer guard that refuses a successful response when a built asset read is empty or shorter than its stat size, retaining the named asset and expected/actual bytes. Integrate these private, disjoint drafts after base-pin checks while jobs remain inactive; keep the stopped build and failed checks as evidence. Verify the focused tests, actual build and retained candidate render before resuming the same shuttle job. This addresses build and preview availability, not measured reconstruction accuracy.
+
+### Reject an observed source-hash transcription error without losing the raw run
+
+The preview recovery passed a full TypeScript/Vite build and actual retained candidate render. The same raw shuttle then reached 47/58 processed and reconstructed events at 186 calls. Its next proposal has one malformed source hash in a placement hint; all 21 source records cite the correct target page49. The existing integrity check correctly prevents accepting it, but the first attempt cannot reach bounded repair. Freeze the exact raw row, scene, checkpoint artifacts, trials, official source and runtime pins first. Do not rewrite the malformed payload or weaken the source check.
+
+Prepare a small, explicitly versioned `exact-source-v1` output-schema profile in a private draft: structured source hash/page fields receive singleton enums from verified engine inputs. Keep legacy schema/request/policy/config/correction bytes unchanged when absent. This does not constrain source values inside opaque `delta_json`; those retain independent validation. Review and test the observed bad payload, valid bound sources, historical request compatibility and restart-only correction controls. Integrate only while all jobs are inactive. A source-guided correction fork restarts main45/ordinal47 under the new schema profile and inherited 600-call lineage ceiling; preserve the raw parent and label the child assisted. Complete and inspect this child before expanding the batch.
+
+Checkpoint availability recovery is complete: ten exact frozen checkpoint copies replace unavailable payloads, with all ten original file objects retained. The accepted scene, all three job rows and 66 source inputs remain unchanged; no inference ran. Create a new complete parent freeze after this recovery. The earlier partial freeze remains sealed and labelled incomplete.
+
+### User scope restriction — current shuttle only
+
+Finish only 31134/booklet-01, including the already prepared source-schema recovery needed to finish its exploration pass. After the first complete, inspectable pass, preserve its final candidate, evaluation and remaining-issues list and gracefully stop this batch. Do not enqueue another set or booklet, start another improvement cycle, or perform a second accuracy correction after completion. Let any active model call finish before task-owned engine/renderer shutdown. Keep every source, raw/corrected revision, prompt, receipt, render, finding and resumable checkpoint. Keep the red aeroplane and previous sets unchanged. If the current pass remains blocked, retain the exact resumable checkpoint and blocker, then stop cleanly. This supersedes earlier batch-expansion plans.
+
+### Current shuttle stopped at the preserved blocker — 5 October 2026
+
+The source-schema recovery child `a43f1622cf5c493c9394c15b57346efd` remains blocked at
+47/58 processed and reconstructed events, with 186 inherited and two completed new calls.
+Its unchanged accepted assembly ends at main44: 110 parts and 55 SceneV2 snapshots.
+The exact blocker is `Verified catalogue inputs changed during hypothesis search`;
+the original error does not identify the changed input. One bounded private replay
+timed out after 45.006857 seconds, leaving safe resume unproven. Do not retry, patch,
+correct, enqueue, or start another improvement cycle in this batch.
+
+Freeze the stopped child, logical database, raw parent, official source, complete
+trial/call evidence and runtime pins. Save a labelled partial evaluation and remaining
+issues, including the single actual accepted-prefix overview. Verify the saved scene,
+source bindings and manifests; record local read limitations without replacing earlier
+models. The engine exited naturally after both model calls finished; verify renderer
+and recovery helpers have exited and all job owners/leases are absent. Finish the
+stopped-run report and status records, then end this task. Booklet completion, human
+review, physical construction and publication remain unachieved.
+
+
+### Engine activity logs — 5 October 2026
+
+Expose existing durable engine events as timestamped INFO activity logs on stderr for local run/watch/step commands. Include source indexing, model-call reservations/completions, trial and checkpoint activity, instruction coverage, findings, completion and blockers. Add a read-only `logs JOB_ID --follow` observer so a Terminal job can be inspected without a restart. Keep JSON stdout and all reconstruction inputs, budgets, prompts, scenes and historical evidence unchanged.
+
+Root owns the CLI, a small read-only observer, focused local tests and documentation. Poll once per second without loading scene artifacts; report long waits at a bounded interval. Logging failures must not interrupt generation, and stopping a follower must not cancel its job. Leave the running Sol worker and core engine modules untouched. Verify read-only behavior, event deduplication, progress accuracy, stderr/stdout separation and local queue regressions; no paid inference or new web services.
+
+Activity logging checkpoint complete: 29 focused logging/queue tests and Ruff pass. Actual read-only Terminal follow and follower SIGINT pass; four historical rows, the active job configuration and five active core modules remain unchanged. The 20-poll sample measures a 3.462 ms median read. No inference or services were started. A Git-wide diff check is blocked by the existing unreadable pack; review uses saved input copies and checks added lines instead. Usage is in ENGINE.md and evidence in `var/evidence/engine-activity-logging-20261005/`.
+
+
+### Test retained Sol shuttle candidate — 6 October 2026
+
+User reports a finished run and requests model testing. Read-only inspection finds job 130e66b0cfda443094061195ef8cea9a at 39/57 processed and reconstructed, 41 processed source events, an expired lease, and an instruction-40 proposal terminated with SIGTERM without structured output. No final exploration completion report exists. Preserve this discrepancy explicitly and ask whether a different job completed while continuing inspection of the retained candidate.
+
+Freeze its raw scene/checkpoint and record all job-row hashes. Run structural/source/asset diagnostics and local evaluation into a fresh ignored evidence directory; inspect actual source/render comparisons, early instructions, detached callouts and the last available assembly in the read-only preview on desktop/phone. Do not resume generation, spend inference, create corrections, reset a lease, change geometry or publish. Record software checks, source-reviewed model defects, incomplete coverage, remaining uncertainty and exact reproducible preview/report locations separately. Preserve prior sets and all source, prompts, receipts and trial evidence.
+
+Saved Sol prefix testing is complete: structural validation and all 41 fresh Three.js renders pass; 59 local preview/evaluation tests pass. Actual preview navigation, main-14 callouts/attachment, replay and phone panels checked. All five job rows, checkpoint and original scene remain unchanged; no model calls added. Incomplete 39/57 coverage and assembly diagnostics remain explicit. Power-log evidence identifies Idle Sleep exceeding the 120-second lease. The user can resume only this job with the saved caffeinate-wrapped command; generation was not started from this chat. Evidence: var/evidence/sol-31134-model-test-20261006T045944Z/VALIDATION_REPORT.md.
+
+6 October 2026 completed-pass status check: user-resumed Sol shuttle job stopped normally at 09:34 Zurich after 57/57 processed panels, 56 reconstructed. Main 39 remains unresolved after its interrupted proposal and invalid source hash in the bounded recovery. Freeze final scene/checkpoint, save a new local evaluation/remaining-issues list, validate structure and inspect the refreshed final preview. These checks are complete; 72 snapshots and 148 pieces are retained. No model calls, corrections or additional sets were triggered. Evidence: var/evidence/sol-31134-completed-pass-check-20261006T082338Z/REPORT.md.
+
+### Publish the completed Sol shuttle candidate — 6 October 2026
+
+User explicitly authorizes adding/replacing this 31134/booklet-01 model in production. Preserve the existing release, red aeroplane and all other catalogue entries. Freeze the exact final scene and job rows, inspect current production pointers, package only approved public scene/individual-part assets, and disclose 56/57 reconstructed panels plus the unresolved main 39. Extend alpha transport only if needed to retain truthful exploration provenance; preserve old alpha compatibility and all source/asset fences. Verify the new bundle and preview, stage immutable assets, record publication approval from the existing authenticated release authority, then promote only this booklet using the observed expected head. Inspect real production loading and both service aliases/CORS, verify other release heads unchanged, and retain exact rollback commands. No inference, new reconstruction, cleanup, new infrastructure or historical overwrites.

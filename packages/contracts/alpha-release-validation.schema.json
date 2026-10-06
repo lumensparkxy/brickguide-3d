@@ -44,7 +44,10 @@
       "type": "string"
     },
     "artifact_kind": {
-      "const": "pdf_assisted_alpha_completion",
+      "enum": [
+        "pdf_assisted_alpha_completion",
+        "exploration_candidate"
+      ],
       "title": "Artifact Kind",
       "type": "string"
     },

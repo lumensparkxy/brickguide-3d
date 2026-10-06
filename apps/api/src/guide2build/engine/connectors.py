@@ -1,7 +1,8 @@
 """Hash-bound nominal connectors for explicitly inspected individual parts.
 
 This is deliberately not a mesh-to-connectivity classifier. In particular, internal
-stud primitives do not become connection sites, and a matching frame does not prove
+stud primitives do not automatically become connection sites; an explicit site
+such as 18980's centre tube requires individual geometry evidence. A matching frame does not prove
 collision freedom, clutch strength, or a physical build.
 """
 from __future__ import annotations
@@ -14,6 +15,7 @@ from pathlib import Path
 
 from ..catalog import ROOT
 from ..core.models import Pose
+from .verification_cache import current_verification
 
 METADATA = ROOT / "config/individual-connectors.json"
 SAFE = re.compile(r"^(parts/(?:s/)?|p/(?:8/|48/)?)[a-z0-9_-]+\.dat$")
@@ -43,10 +45,10 @@ def transform_point(pose: Pose | dict, point):
     return world
 
 
-def _read_json(path, bound):
+def _read_json(path, bound, verification=None):
     if path.is_symlink() or path.stat().st_size > bound:
         raise ValueError("Unsafe or oversized connector metadata/provenance")
-    return json.loads(path.read_text())
+    return json.loads(verification.read(path, bound).decode() if verification else path.read_text())
 
 
 def load_connector_catalogue(geometry_root: Path, geometry_refs=None, *, metadata_path: Path | None = None):
@@ -56,13 +58,24 @@ def load_connector_catalogue(geometry_root: Path, geometry_refs=None, *, metadat
     A library update needs a deliberate metadata review; updating a cache receipt is
     insufficient to reuse connector assumptions from different mesh bytes.
     """
-    metadata = _read_json(metadata_path or METADATA, 2_000_000)
+    verification = current_verification()
+    if verification is None:
+        return _load_connector_catalogue(geometry_root, geometry_refs, metadata_path=metadata_path)
+    references = None if geometry_refs is None else tuple(sorted(set(geometry_refs)))
+    metadata_path = metadata_path or METADATA
+    key = (Path(geometry_root).absolute(), references, Path(metadata_path).absolute())
+    return verification.catalogue(key, lambda: _load_connector_catalogue(
+        geometry_root, references, metadata_path=metadata_path, verification=verification))
+
+
+def _load_connector_catalogue(geometry_root, geometry_refs=None, *, metadata_path=None, verification=None):
+    metadata = _read_json(metadata_path or METADATA, 2_000_000, verification)
     if metadata.get("schema_version") != "1.0":
         raise ValueError("Unsupported connector metadata version")
     root = Path(geometry_root)
     if root.is_symlink():
         raise ValueError("Symlink connector geometry root")
-    manifest = _read_json(root / "provenance.json", 10_000_000)
+    manifest = _read_json(root / "provenance.json", 10_000_000, verification)
     records, mapping = manifest["resources"], manifest.get("file_map", {})
     available = {part["geometry_ref"]: part for part in metadata["parts"]}
     requested = set(geometry_refs) if geometry_refs is not None else set(available) & set(records)
@@ -87,7 +100,7 @@ def load_connector_catalogue(geometry_root: Path, geometry_refs=None, *, metadat
             if (target.is_symlink() or not target.resolve().is_relative_to(root.resolve())
                     or target.stat().st_size > 1_000_000):
                 raise ValueError("Unsafe connector geometry path or size")
-            data = target.read_bytes()
+            data = verification.read(target, 1_000_000) if verification else target.read_bytes()
             if hashlib.sha256(data).hexdigest() != record.get("sha256"):
                 raise ValueError("Connector geometry hash mismatch")
             dependencies = set()

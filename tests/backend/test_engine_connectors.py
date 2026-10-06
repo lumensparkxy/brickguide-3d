@@ -127,6 +127,65 @@ def test_pilot_asymmetric_receivers_do_not_use_bounds_or_internal_supports():
     assert parts["3023"]["canonical_geometry_alias"] == "parts/3023b.dat"
 
 
+def test_18980_center_receiver_is_distinct_from_grid_and_other_unreviewed_tubes():
+    from types import SimpleNamespace
+    from guide2build.core.models import Pose
+    from guide2build.engine.spatial import _contacts
+
+    metadata = json.loads(connectors.METADATA.read_text())
+    catalogue = {part["geometry_ref"]: part for part in metadata["parts"]}
+    plate = catalogue["parts/18980.dat"]
+    centre = connectors.connector(plate, "socket:0:-8:0")
+    assert centre["position_ldu"] == [0, -8, 0]
+    assert centre["normal"] == [0, -1, 0] and centre["tangent"] == [1, 0, 0]
+    assert centre["engagement_ldu"] == 4 and "landmark" not in centre
+    assert len([feature for feature in plate["connectors"] if feature["kind"] == "socket"]) == 11
+    for x in [-40, -20, 20, 40]:
+        with pytest.raises(ValueError, match="Unknown connector"):
+            connectors.connector(plate, f"socket:{x}:-8:0")
+    # Original synthetic arrangement of two individual parts, unrelated to booklet poses.
+    instances = {"support": SimpleNamespace(geometry_ref="parts/3040b.dat"),
+                 "plate": SimpleNamespace(geometry_ref="parts/18980.dat")}
+    poses = {"support": Pose(position_ldu=[0, 0, 0], quaternion_xyzw=[0, 0, 0, 1]),
+             "plate": Pose(position_ldu=[0, 8, 0], quaternion_xyzw=[0, 0, 0, 1])}
+    contacts = _contacts(poses, instances, catalogue, metadata["tolerance_ldu"])
+    assert contacts == [{"socket": ["plate", "socket:0:-8:0"],
+                         "stud": ["support", "stud:0:0:0"], "distance_ldu": 0.0}]
+    poses["plate"].position_ldu = (0, 10, 0)
+    assert not _contacts(poses, instances, catalogue, metadata["tolerance_ldu"])
+
+
+def test_available_18980_center_tube_matches_pinned_transform_radius_and_depth():
+    root = connectors.ROOT / "var/public/ldraw"
+    if not (root / "provenance.json").exists():
+        pytest.skip("Optional retained individual geometry evidence is not bundled with tests")
+    _, parts = connectors.load_connector_catalogue(root, ["parts/18980.dat"])
+    part = parts["parts/18980.dat"]
+    pins = dict(part["evidence_resources"])
+    def lines(reference):
+        raw = (root / reference).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == pins[reference]
+        return [line.split(maxsplit=14) for line in raw.decode().splitlines() if line.startswith("1 ")]
+    root_transform = next(line for line in lines("parts/18980.dat") if line[14] == "stug4-1x5.dat")
+    assert list(map(float, root_transform[2:14])) == [0, 4, 0, 1, 0, 0, 0, -1, 0, 0, 0, 1]
+    tubes = lines("p/stug4-1x5.dat")
+    assert [float(line[2]) for line in tubes] == [-40, -20, 0, 20, 40]
+    centre_transform = tubes[2]
+    assert centre_transform[14] == "stud4.dat"
+    assert list(map(float, centre_transform[2:14])) == [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
+    inner_cylinder = next(line for line in lines("p/stud4.dat")
+                          if line[14] == "4-4cyli.dat" and float(line[5]) == 6)
+    assert list(map(float, inner_cylinder[2:14])) == [0, -4, 0, 6, 0, 0, 0, 4, 0, 0, 0, 6]
+    stud_cylinder = next(line for line in lines("p/stud.dat") if line[14] == "4-4cyli.dat")
+    assert list(map(float, stud_cylinder[2:14])) == [0, 0, 0, 6, 0, 0, 0, -4, 0, 0, 0, 6]
+    # Root Y flip maps tube mouth raw y=-4 -> part raw y=8 -> canonical y=-8.
+    mouth_y = -(4 + (-1)*(-4))
+    inner_y = -(4 + (-1)*0)
+    receiver = connectors.connector(part, "socket:0:-8:0")
+    assert receiver["position_ldu"] == [0, mouth_y, 0]
+    assert inner_y-mouth_y == receiver["engagement_ldu"] == 4
+
+
 @pytest.mark.parametrize(("part_id", "excluded"), [
     ("11477", ["socket:0:0:10", "stud:0:0:0"]),
     ("15573", ["socket:0:-8:0", "stud:10:0:0"]),

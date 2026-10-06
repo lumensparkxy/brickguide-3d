@@ -97,6 +97,43 @@ def test_alpha_package_preserves_unverified_checks_and_has_no_private_artifacts(
         package(alpha_input, output)
 
 
+def test_exploration_alpha_preserves_partial_coverage_and_generation_provenance(alpha_input, tmp_path):
+    alpha_input['alpha'].update(artifact_kind='exploration_candidate', generation_mode='explore',
+        source_coverage='all_instructions_processed_partial_reconstruction_unverified',
+        coverage_text='Reported coverage (unverified): main step 2 is unresolved.')
+    alpha_input['scene'].steps[1].main_step_number = 3
+    alpha_input['source_index']['reported_step_keys'] = coverage_keys(alpha_input['scene'])
+    alpha_input['preview_binding']['scene_sha256'] = digest(alpha_input['scene'])
+    output = tmp_path / 'exploration'
+    manifest = package(alpha_input, output)
+    assert verify_bundle(output) == manifest
+    assert manifest['alpha'] == alpha_input['alpha']
+    assert manifest['instances'] == alpha_input['scene'].model_dump(mode='json')['instances']
+    assert 'main:2' not in alpha_input['source_index']['reported_step_keys']
+    assert json.loads((output / 'validation.json').read_bytes())['artifact_kind'] == 'exploration_candidate'
+
+
+@pytest.mark.parametrize('artifact_kind,generation_mode', [
+    ('pdf_assisted_alpha_completion', 'explore'), ('exploration_candidate', 'alpha_fast'),
+])
+def test_alpha_rejects_mismatched_generation_provenance(alpha_input, artifact_kind, generation_mode):
+    with pytest.raises(ValueError, match='generation mode'):
+        AlphaDisclosure.model_validate(alpha_input['alpha'] | {
+            'artifact_kind': artifact_kind, 'generation_mode': generation_mode})
+
+
+def test_alpha_validation_cannot_change_disclosed_provenance(alpha_input, tmp_path):
+    from guide2build.releases.packaging import validate_scene_manifest
+    alpha_input['alpha'].update(artifact_kind='exploration_candidate', generation_mode='explore')
+    output = tmp_path / 'exploration'
+    manifest = package(alpha_input, output)
+    report = json.loads((output / 'validation.json').read_bytes())
+    report['artifact_kind'] = 'pdf_assisted_alpha_completion'
+    with pytest.raises(ValueError, match='disclosed artifact kind'):
+        validate_scene_manifest(manifest, alpha_input['scene'].model_dump(mode='json')['steps'],
+            canonical(report), alpha_input['source_index'], trusted_source_registry=alpha_input['trusted_source_registry'])
+
+
 @pytest.mark.parametrize('field,value', [
     ('accuracy', 'verified'), ('human_review', 'pass'), ('physical_build', 'pass'),
     ('artifact_kind', 'automatic_reconstruction'), ('source_coverage', 'independently_verified'),

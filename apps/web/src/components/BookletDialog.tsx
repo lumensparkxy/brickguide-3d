@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { IconX } from '@tabler/icons-react';
+import IconX from '@tabler/icons-react/dist/esm/icons/IconX.mjs';
 
 export default function BookletDialog({children,onClose}:{children:ReactNode;onClose:()=>void}) {
   const ref=useRef<HTMLDialogElement>(null);

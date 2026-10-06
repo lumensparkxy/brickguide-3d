@@ -20,3 +20,10 @@ coverage/
 .DS_Store
 *.egg-info/
 # Keep generated package-lock.json and uv.lock in git once installation succeeds.
+
+/.venv
+/node_modules
+/var
+
+# macOS duplicate generated builds are not source.
+**/dist [0-9]*/

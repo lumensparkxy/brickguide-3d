@@ -8,6 +8,7 @@ import re
 import sqlite3
 import threading
 from contextlib import closing
+from copy import deepcopy
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -18,6 +19,7 @@ from ..jobs.source_cache import cached_receipt
 from ..releases.models import SceneV2, canonical, digest
 from ..releases.packaging import compact_step_index, geometry_closure
 from ..source_limits import MAX_BYTES
+from .checkpoint_artifacts import checkpoint_artifact_stat, hydrate_checkpoint
 from .quality import quality_summary
 
 
@@ -48,11 +50,50 @@ def _uncertainty_text(note) -> str | None:
         return note
     if not isinstance(note, dict):
         return None
-    text = note.get('reason') or note.get('message')
+    text = note.get('reason') or note.get('message') or note.get('description')
     if not isinstance(text, str):
         return None
     resolution = note.get('resolution')
     return f'{text} {resolution}' if isinstance(resolution, str) and resolution else text
+
+
+def exploration_status(config: dict, checkpoint: dict) -> dict | None:
+    """Expose bounded, plain-text diagnostics without private proposal paths."""
+    from .repair_feedback import compact_feedback
+    if config.get('execution_policy', 'strict') != 'explore':
+        return None
+    records = checkpoint.get('instruction_results', [])
+    if isinstance(records, dict):
+        records = list(records.values())
+    instructions = []
+    for record in records[:4096]:
+        panel = record.get('panel', {})
+        findings = record.get('findings', [])
+        plain = [({'description': item} if isinstance(item, str) else item)
+                 for item in findings if isinstance(item, (str, dict))]
+        focused = compact_feedback(plain, record.get('step_ids', []), input_truncated=None)
+        clean = []
+        for group in focused['findings']:
+            finding = group['finding']
+            message = str(finding.get('description', finding.get('message', finding.get('reason', 'Needs inspection'))))[:2000]
+            if group['occurrence_count'] > 1:
+                message += f" (Recorded {group['occurrence_count']} times.)"
+            clean.append({'category': str(finding.get('category', finding.get('code', 'quality')))[:100],
+                          'message': message[:2000],
+                          'instance_ids': [str(v)[:160] for v in group['instance_ids']],
+                          'step_ids': [str(v)[:160] for v in group['step_ids']]})
+        instructions.append({'ordinal': int(record.get('ordinal', len(instructions))),
+                             'main_step_number': panel.get('number', record.get('main_step_number')),
+                             'page_index': int(record.get('page_index', 0)),
+                             'step_ids': [str(v)[:160] for v in record.get('step_ids', [])[:256]],
+                             'reconstructed': bool(record.get('reconstructed', record.get('step_ids'))),
+                             'needs_recheck': bool(record.get('checks_invalidated')),
+                             'finding_count': len(findings), 'findings': clean})
+    return {'processed_panels': checkpoint.get('processed_panels', len(instructions)),
+            'reconstructed_panels': checkpoint.get('reconstructed_panels', 0),
+            'model_calls_used': checkpoint.get('model_calls_used', 0),
+            'max_model_calls': config.get('max_model_calls', 100),
+            'instructions': instructions}
 
 
 class _CandidatePreview:
@@ -64,6 +105,9 @@ class _CandidatePreview:
         self._cache_lock = threading.RLock()
         self._job_cache = None
         self._scene_cache = None
+        self._exploration_cache = None
+        self._checkpoint_storage = None
+        self._checkpoint_stat = None
         selected = self.job()
         self.set_number, self.guide_id = selected['set_number'], selected['guide_id']
         self.guide = find_guide(self.set_number, self.guide_id)
@@ -76,11 +120,13 @@ class _CandidatePreview:
             files = (self.db, self.db.with_name(self.db.name + '-wal'))
             identity = tuple(_file_identity(path) if path.exists() else None for path in files)
             if self._job_cache is not None and self._job_cache[0] == identity:
-                return self._job_cache[1]
+                artifact = checkpoint_artifact_stat(self.db.parent, self.job_id, self._job_cache[2])
+                if artifact == self._job_cache[3]:
+                    return self._job_cache[1]
             value = self._read_job()
             after = tuple(_file_identity(path) if path.exists() else None for path in files)
             if after == identity:
-                self._job_cache = identity, value
+                self._job_cache = identity, value, self._checkpoint_storage, self._checkpoint_stat
             return value
 
     def _read_job(self):
@@ -90,8 +136,15 @@ class _CandidatePreview:
         if row is None:
             raise ValueError('Engine job does not exist')
         value = dict(row)
-        for key in ('config', 'checkpoint', 'error'):
+        for key in ('config', 'error'):
             value[key] = json.loads(value[key]) if value[key] else None
+        stored = value['checkpoint']
+        before = checkpoint_artifact_stat(self.db.parent, self.job_id, stored)
+        value['checkpoint'] = hydrate_checkpoint(self.db.parent, self.job_id, stored)
+        after = checkpoint_artifact_stat(self.db.parent, self.job_id, stored)
+        if after != before:
+            raise ValueError('Checkpoint candidate changed during preview verification')
+        self._checkpoint_storage, self._checkpoint_stat = stored, after
         return value
 
     def _source_receipt(self, guide_id: str, official_url: str):
@@ -147,8 +200,22 @@ class _CandidatePreview:
             raise ValueError('Candidate does not match the persisted job checkpoint')
         return scene
 
+    def _exploration_status(self, current: dict):
+        # The job cache replaces this object after a committed DB change. Group
+        # unchanged findings once, while candidate/source checks remain live.
+        with self._cache_lock:
+            saved = self._exploration_cache
+            if saved is None or saved[0] is not current:
+                value = exploration_status(current['config'], current['checkpoint'])
+                self._exploration_cache = current, value
+            return deepcopy(self._exploration_cache[1])
+
     def status(self):
-        current = self.job()
+        try:
+            current = self.job()
+        except (OSError, ValueError, KeyError, TypeError):
+            raise HTTPException(409, {'code': 'checkpoint_unavailable',
+                'message': 'The saved candidate checkpoint is unavailable or changed. Retained evidence needs inspection.'}) from None
         checkpoint = current['checkpoint']
         available = False
         reason = revision = None
@@ -184,6 +251,8 @@ class _CandidatePreview:
                 'image_quality': quality_summary(current['config'], checkpoint),
                 'camera_alignment_check': 'measured_per_instruction' if measured and not fast else 'not_run',
                 'artifact_kind': checkpoint.get('artifact_kind') or current['config'].get('artifact_kind', 'engine_candidate_preview'),
+                'execution_policy': current['config'].get('execution_policy', 'strict'),
+                'exploration': self._exploration_status(current),
                 'publication': 'not_performed'}
 
     def snapshot(self):

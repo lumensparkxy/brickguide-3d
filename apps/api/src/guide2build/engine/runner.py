@@ -7,10 +7,10 @@ import time
 import uuid
 from ..catalog import find_guide
 from ..jobs.source_cache import cached_receipt
-from ..source import download_pdf, render_pages
+from ..source import download_pdf, render_pages, checkpoint_source_receipt, validate_trusted_page_bindings
 from .contracts import PageIndex, Review, strict_schema
 from .delta import SceneDelta, current_context, page_review_context
-from .provider import CodexProvider, ProviderFailure
+from .provider import DEFAULT_INFERENCE_TIMEOUT_SECONDS, CodexProvider, ProviderFailure
 from .store import LeaseLost, PIPELINE
 from ..releases.models import digest as scene_digest
 
@@ -38,6 +38,19 @@ def scene_type():
     return SceneV2
 
 
+def _trusted_exploration_pages(job, checkpoint, source_sha256, page_count):
+    """Only existing private checkpoint pixels may authorize lossless source reuse."""
+    if job["config"].get("execution_policy") != "explore" or "exploration_source_pages" not in checkpoint:
+        return None
+    if (checkpoint.get("source_sha256") != source_sha256 or type(checkpoint.get("page_count")) is not int
+            or checkpoint["page_count"] != page_count):
+        raise ValueError("Exploration source cache proof does not match the selected source and page count")
+    if job["config"].get("source_sha256") not in (None, source_sha256):
+        raise ValueError("Exploration source cache proof differs from the configured source")
+    return validate_trusted_page_bindings({"source_sha256": source_sha256, "page_count": page_count,
+                                          "pages": checkpoint["exploration_source_pages"]})
+
+
 def validate_candidate(value, job, digest, page_count, previous=None, panel=None, page_index=None):
     scene = scene_type().model_validate_json(value)
     if scene.set_number != job["set_number"] or scene.guide_id != job["guide_id"]:
@@ -52,7 +65,10 @@ def validate_candidate(value, job, digest, page_count, previous=None, panel=None
         raise ValueError("Model cannot grant review")
     if any(getattr(scene, key) != "not_run" for key in ("geometry_check", "connector_check", "physical_build_check")):
         raise ValueError("Model cannot self-certify checks")
-    for instance in scene.instances:
+    # A correction fork may retain an explicitly assisted immutable prefix.
+    # Its new model-authored suffix must still have unprivileged proposal origins.
+    prefix = len((previous or {}).get("instances", [])) if job.get("config", {}).get("execution_policy") == "explore" else 0
+    for instance in scene.instances[prefix:]:
         if instance.origin != "vision_proposal" or instance.mapping_status != "candidate":
             raise ValueError("Model cannot impersonate reviewed authoring")
     for source in [i.source for i in scene.instances] + [s.source for s in scene.steps]:
@@ -79,9 +95,14 @@ def validate_candidate(value, job, digest, page_count, previous=None, panel=None
     return scene
 
 
+class WorkerStopped(InterruptedError):
+    """An explicit queue stop retains the accepted checkpoint as resumable."""
+
+
 class Heartbeat:
-    def __init__(self, store, job_id, owner):
+    def __init__(self, store, job_id, owner, *, stop_event=None):
         self.store, self.job_id, self.owner = store, job_id, owner
+        self.stop_event = stop_event
         self.stop = threading.Event()
         self.failure = None
         self.thread = threading.Thread(target=self.run, daemon=True)
@@ -97,7 +118,9 @@ class Heartbeat:
     def check(self):
         if self.failure:
             raise self.failure
-        if self.store.get(self.job_id)["cancel"]:
+        if self.stop_event is not None and self.stop_event.is_set():
+            raise WorkerStopped("Local queue stopped; accepted evidence and attempts are retained")
+        if self.store.cancel_requested(self.job_id):
             raise InterruptedError("Job cancelled")
 
     def __enter__(self):
@@ -109,16 +132,17 @@ class Heartbeat:
         self.thread.join()
 
 
-def run_once(store, provider=None, *, job_id=None, max_panels=None):
+def run_once(store, provider=None, *, job_id=None, max_panels=None,
+             max_concurrent_jobs=1, stop_event=None):
     if max_panels is not None and (not isinstance(max_panels, int) or max_panels < 1):
         raise ValueError("Instruction limit must be a positive integer")
     owner = uuid.uuid4().hex
-    job = store.claim(owner, job_id=job_id)
+    job = store.claim(owner, job_id=job_id, max_concurrent_jobs=max_concurrent_jobs)
     if not job:
         return False
     if job["config"].get("generation_mode") == "alpha_fast":
         from .alpha_runner import run_alpha_claimed
-        return run_alpha_claimed(store, job, owner, provider, max_chunks=max_panels)
+        return run_alpha_claimed(store, job, owner, provider, max_chunks=max_panels, stop_event=stop_event)
     checkpoint = job["checkpoint"]
     previous_runner = checkpoint.get("runner_version")
     checkpoint["runner_version"] = PIPELINE
@@ -154,7 +178,7 @@ def run_once(store, provider=None, *, job_id=None, max_panels=None):
         raise ProviderFailure("proposal_rejected", "; ".join(errors))
 
     try:
-        with Heartbeat(store, job["id"], owner) as heartbeat:
+        with Heartbeat(store, job["id"], owner, stop_event=stop_event) as heartbeat:
             heartbeat.check()
             from .quality import bind_source_view_policy
             bind_source_view_policy(job["config"], checkpoint)
@@ -178,21 +202,35 @@ def run_once(store, provider=None, *, job_id=None, max_panels=None):
                 checkpoint["predecessor_job_id"] = prior["id"]
             save("source")
             source = store.data_dir / "sources" / job["set_number"] / job["guide_id"] / "source.pdf"
-            receipt = cached_receipt(store.data_dir, job["set_number"], job["guide_id"], guide["pdf_url"])
-            if receipt is None:
-                receipt = download_pdf(guide["pdf_url"], source, check_cancel=heartbeat.check)
+            trusted_pages = _trusted_exploration_pages(job, checkpoint, checkpoint.get("source_sha256"),
+                                                       guide["expected_page_count"])
+            if trusted_pages is not None:
+                receipt = checkpoint_source_receipt(source, guide["pdf_url"], trusted_pages["source_sha256"],
+                                                     check_cancel=heartbeat.check)
+            else:
+                receipt = cached_receipt(store.data_dir, job["set_number"], job["guide_id"], guide["pdf_url"])
+                if receipt is None:
+                    receipt = download_pdf(guide["pdf_url"], source, check_cancel=heartbeat.check)
             digest = receipt["sha256"]
             if (checkpoint.get("source_sha256", digest) != digest or
                     job["config"].get("source_sha256") not in (None, digest)):
                 raise ValueError("Source changed since checkpoint; enqueue a new source revision")
             checkpoint["source_sha256"] = digest
             pages_dir = store.data_dir / "public/pages" / digest
-            pages = render_pages(source, pages_dir, expected_sha256=digest, check_cancel=heartbeat.check)
+            reuse = {"trusted_page_bindings": trusted_pages} if trusted_pages is not None else {}
+            pages = render_pages(source, pages_dir, expected_sha256=digest, check_cancel=heartbeat.check, **reuse)
             if len(pages) != guide["expected_page_count"]:
                 raise ValueError("Source page count changed; source identity requires review")
             checkpoint["page_count"] = len(pages)
             atomic_json(directory / "source-receipt.json", receipt)
-            runtime = provider or CodexProvider(model=job["config"]["model"])
+            runtime = provider or CodexProvider(model=job["config"]["model"],
+                reasoning=job["config"].get("reasoning", "high"),
+                timeout=job["config"].get("provider_timeout", DEFAULT_INFERENCE_TIMEOUT_SECONDS))
+            if job["config"].get("execution_policy") == "explore":
+                from .exploration import run_exploration
+                return run_exploration(job=job, checkpoint=checkpoint, directory=directory,
+                    source_hash=digest, pages_dir=pages_dir, page_count=len(pages), runtime=runtime,
+                    save=save, heartbeat=heartbeat, continuation=continuation, max_panels=max_panels, store=store)
             indexes = checkpoint.setdefault("page_indexes", [])
             for page_index in range(len(indexes), len(pages)):
                 image = pages_dir / f"page-{page_index:03d}.png"
@@ -347,6 +385,11 @@ def run_once(store, provider=None, *, job_id=None, max_panels=None):
             atomic_json(directory / "validation.json", report)
             save("needs_validation", "blocked", {"code": "assembly_validation_required",
                 "message": report["blockers"][0]})
+    except WorkerStopped as error:
+        try:
+            save("queue_stopped", "paused", {"code": "queue_stopped", "message": str(error)})
+        except (InterruptedError, LeaseLost):
+            pass
     except (InterruptedError, LeaseLost):
         try:
             save("cancelled", "cancelled")

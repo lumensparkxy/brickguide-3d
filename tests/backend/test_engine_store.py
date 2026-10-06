@@ -21,6 +21,21 @@ def test_durable_dedupe_and_single_global_lease(tmp_path):
     assert store.claim("worker2")["guide_id"] == "alt-01"
 
 
+def test_proposal_profiles_are_explicit_durable_and_preserve_baseline_dedupe(tmp_path):
+    store = EngineStore(tmp_path)
+    config = {"model": "test", "execution_policy": "explore", "revision": "synthetic-profile"}
+    baseline = store.enqueue("30669", "alt-02", config)
+    assert store.enqueue("30669", "alt-02", config | {"proposal_profile": "baseline"})["id"] == baseline["id"]
+    variant = store.enqueue("30669", "alt-02", config | {"proposal_profile": "attachment-reasoning"})
+    assert variant["id"] != baseline["id"]
+    assert EngineStore(tmp_path).get(variant["id"])["config"]["proposal_profile"] == "attachment-reasoning"
+    assert "proposal_profile" not in EngineStore(tmp_path).get(baseline["id"])["config"]
+    with pytest.raises(ValueError, match="explore"):
+        store.enqueue("30669", "alt-02", {"model": "test", "proposal_profile": "attachment-reasoning"})
+    with pytest.raises(ValueError, match="profile"):
+        store.enqueue("30669", "alt-02", config | {"proposal_profile": "unregistered"})
+
+
 def test_expired_lease_is_fenced_and_resumes_checkpoint(tmp_path):
     store = EngineStore(tmp_path)
     job = enqueue(store)

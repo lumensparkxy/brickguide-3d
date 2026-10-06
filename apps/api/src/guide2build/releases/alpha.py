@@ -25,8 +25,8 @@ def check_public_text(value: str) -> str:
 
 
 class AlphaDisclosure(StrictModel):
-    artifact_kind: Literal['pdf_assisted_alpha_completion']
-    generation_mode: Literal['alpha_fast']
+    artifact_kind: Literal['pdf_assisted_alpha_completion', 'exploration_candidate']
+    generation_mode: Literal['alpha_fast', 'explore']
     source_coverage: str = Field(min_length=1, max_length=120)
     coverage_text: str = Field(min_length=1, max_length=1000)
     uncertainty_notes: list[str] = Field(min_length=1, max_length=100)
@@ -51,6 +51,11 @@ class AlphaDisclosure(StrictModel):
 
     @model_validator(mode='after')
     def unverified_labels(self):
+        if self.generation_mode != {
+            'pdf_assisted_alpha_completion': 'alpha_fast',
+            'exploration_candidate': 'explore',
+        }[self.artifact_kind]:
+            raise ValueError('Alpha artifact kind differs from its generation mode')
         if ('unverified' not in self.source_coverage
                 or 'independently_verified' in self.source_coverage
                 or not self.coverage_text.startswith('Reported coverage (unverified): ')):
@@ -83,7 +88,7 @@ class AlphaPreviewBinding(StrictModel):
 
 class AlphaReleaseValidation(StrictModel):
     release_kind: Literal['unverified_alpha']
-    artifact_kind: Literal['pdf_assisted_alpha_completion']
+    artifact_kind: Literal['pdf_assisted_alpha_completion', 'exploration_candidate']
     scene_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     coverage_index_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     preview_binding: AlphaPreviewBinding

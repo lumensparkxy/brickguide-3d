@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
-import {Box3,Vector3} from 'three';
-import {approachFor,approachIsClear,checkedApproach} from './placement';
+import {Box3,Quaternion,Vector3} from 'three';
+import {approachFor,approachIsClear,checkedApproach,replayPlan} from './placement';
 import evidence from '../../../config/placement-30669-alt-02-v3.json';
 import type {SceneManifest,StepSnapshot} from './contracts';
 const box=(lo:number[],hi:number[])=>new Box3(new Vector3(...lo),new Vector3(...hi));
@@ -33,5 +33,17 @@ describe('source-aware placement paths',()=>{
     const barrier=box([15,25,-10],[35,30,10]);const offset=new Vector3(0,60,0);
     expect(approachIsClear([left],[barrier],offset)).toBe(true);
     expect(checkedApproach({mode:'translate',offset,reason:'above'},[left,right],[barrier]).mode).toBe('highlight');
+  });
+  it('provides a labelled camera-relative preview without changing source-direction decisions',()=>{
+    const guarded=checkedApproach({mode:'translate',offset:new Vector3(0,60,0),reason:'above'},
+      [box([-5,0,-5],[5,8,5])],[box([-20,25,-20],[20,30,20])]);
+    expect(guarded.mode).toBe('highlight');
+    const rotation=new Quaternion().setFromAxisAngle(new Vector3(0,0,1),Math.PI/2);
+    const plan=replayPlan(guarded,rotation,200);
+    expect(plan.mode).toBe('preview');expect(plan.reason).toBe('visual_preview');
+    expect(plan.offset.x).toBeCloseTo(-36);expect(plan.offset.y).toBeCloseTo(0);
+    expect(guarded.offset.toArray()).toEqual([0,0,0]);expect(guarded.reason).toBe('blocked_approach');
+    const reviewed={mode:'translate',offset:new Vector3(0,-60,0),reason:'below'} as const;
+    expect(replayPlan(reviewed,rotation,200)).toBe(reviewed);
   });
 });

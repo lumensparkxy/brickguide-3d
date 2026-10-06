@@ -180,3 +180,9 @@ details{font-size:12px;line-height:1.6}summary{cursor:pointer;padding:10px 0;fon
 }
 .workspace{grid-template-columns:minmax(0,1fr)}
 .workspace-grid,.studio-header,.step-navigation,.workspace-heading h1{min-width:0}
+.exploration-findings{margin:18px 0;padding:12px;border:1px solid #d4dfeb;border-radius:8px;background:#f7faff;font-size:13px;overflow-wrap:anywhere}
+.exploration-findings>summary{cursor:pointer;font-weight:700;color:#164875}
+.exploration-findings section{padding:10px 0;border-bottom:1px solid #d4dfeb}
+.exploration-findings ul{padding-left:18px}.exploration-findings li{margin:10px 0}
+.finding-category{display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:#895400;margin-bottom:3px}
+.finding-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.finding-actions button{padding:6px 9px;min-height:36px;font-size:12px}

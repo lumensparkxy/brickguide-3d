@@ -322,9 +322,7 @@ def rejected_cover_batch(assisted_import, monkeypatch):
         trials.append(str(trial))
     checkpoint = {"source_sha256": source_hash,
         "alpha_page_manifest_sha256": hashlib.sha256((pages / "pages.json").read_bytes()).hexdigest(),
-        "alpha_policy": {"version": alpha.ALPHA_VERSION, "source_sha256": source_hash, "page_count": 8,
-            "page_batch_size": 4, "max_chunk_attempts": 5,
-            "material_choice": "most_likely_source_with_alternatives", "pose_choice": "direct_source_approximation"},
+        "alpha_policy": alpha._execution_policy({"alpha_page_batch_size": 4, "max_chunk_attempts": 5}, source_hash, 8),
         "alpha_chunks": {"0": {"used": 5, "limit": 5, "trials": trials, "feedback": []}}}
     # The fixture's default batch size is six; this separate explicit job freezes four.
     job = store.enqueue("99999", "synthetic", {"generation_mode": "alpha_fast", "quality_profile": "alpha",

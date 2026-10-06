@@ -1,7 +1,17 @@
-import { Box3, Vector3 } from 'three';
+import { Box3, Quaternion, Vector3 } from 'three';
 import evidence from '../../../config/placement-30669-alt-02-v3.json';
 import type { SceneManifest, StepSnapshot } from './contracts';
 export interface PlacementPlan { mode:'translate'|'highlight'; offset:Vector3; reason:string; }
+export interface ReplayPlan { mode:'translate'|'preview'|'highlight'; offset:Vector3; reason:string; }
+
+/** A camera-relative visual entrance, not an inferred physical attachment path.
+ * Keep source-bound approaches and their collision guard independent from this effect.
+ * One shared offset preserves the relative poses of an active subassembly.
+ */
+export function replayPlan(approach:PlacementPlan, cameraRotation:Quaternion, viewHeight:number):ReplayPlan {
+  if(approach.mode==='translate')return approach;
+  return {mode:'preview',offset:new Vector3(0,Math.max(8,viewHeight*.18),0).applyQuaternion(cameraRotation),reason:'visual_preview'};
+}
 
 /** Authored presentation hints are scoped to exact source, revision, step and active identities. */
 export function approachFor(scene:SceneManifest, step:StepSnapshot):PlacementPlan {

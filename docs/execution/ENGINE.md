@@ -1,8 +1,171 @@
 # Local batch engine
 
+Routine development checks: `.venv/bin/python tools/check.py --quick` runs selected regressions and
+frontend type checks/tests. The no-flag command retains full CI/release validation. See
+[test-suite optimization](TEST_SUITE_OPTIMIZATION.md). Tests are separate from generation and playback.
+
+Latest maintenance: [engine efficiency changes and measured limits](ENGINE_EFFICIENCY.md),
+following the [generation and local overhead cleanup](OVERHEAD_CLEANUP.md).
+New exploration jobs default to `incremental-v1` for exact compact context and actionable
+repair selection; frozen legacy jobs retain their policy. Searches reuse unchanged verified
+diagnostic prefixes, new checkpoints reference immutable candidates, and `--workers 2`
+explicitly schedules independent sets. Candidate limits, source checks and model settings
+remain unchanged. All local web instances were stopped at the user’s request on
+4 October 2026; saved scenes remain available for a later preview restart.
+
 The private Python engine runs source indexing and fresh Codex CLI proposals. It never loads authored
 reference scenes. Only official page images, its own earlier proposal checkpoints and verified individual
 part geometry are supplied as assembly/geometry inputs. It is separate from the public portal API.
+
+## Complete-booklet improvement runs
+
+Use `explore` to retain imperfect renderable proposals and continue through quality findings. `strict`
+remains the default. Both policies require intact official source evidence, valid SceneV2 structure,
+actual individual geometry and bounded resources. Exploration never grants publication or validation.
+
+```sh
+.venv/bin/python tools/engine.py enqueue --set 30669 --guide alt-02 --execution-policy explore --model gpt-6-astra --reasoning high --max-model-calls 100 --revision YOUR_NEW_REVISION
+.venv/bin/python tools/engine.py run --job-id JOB_ID
+.venv/bin/python tools/engine.py evaluate JOB_ID --reference var/evidence/accuracy-30669-20261004/source-reviewed-combined.json --baseline var/evidence/accuracy-30669-20261004/baseline/scene.json --output var/evidence/NEW_EVALUATION
+```
+
+The targeted `run` processes only that job, including a paused correction fork. Exploration permits one
+initial proposal and at most one targeted repair per indexed instruction panel, including its callouts. Camera,
+connection, overlap, coverage and visual-review findings remain diagnostics. A source camera that cannot
+be fitted falls back to a labelled overview; its silhouette cannot establish source agreement. An
+instruction without a renderable proposal remains unresolved while subsequent instructions are processed.
+The preview and evaluation report distinguish instructions processed, instructions reconstructed and
+individual snapshots. A complete processing pass is not a correctness claim.
+
+The model and reasoning setting are frozen in each job. The model-call ceiling includes indexing,
+proposal and comparison calls and is inherited by correction forks. Reserved interrupted calls consume
+budget; recovery does not silently repeat them. Authentication or provider availability failures and
+resource exhaustion remain operational stops. They do not erase the retained candidate or findings.
+
+Fresh exploration jobs can explicitly select `--review-profile localized-source-v4` and
+`--new-part-failure-profile new-design-rejection-v2`. The review profile supplies bounded physical
+instance/source context and requires distinct named observations when comparing localized defects.
+Unlocalized or incomplete comparisons remain incomparable. The new-part profile retains an explicitly
+classified unsupported shortcut as a rejected new design, permits the single targeted re-identification
+repair, then continues unresolved when necessary. Source, hash, path, licence, material, accepted-part
+and resource integrity failures remain operational stops. These opt-in profiles do not change existing
+job policies or reset shared budgets; direct correction commands cannot silently change profiles.
+
+Fresh exploration jobs can also select `--source-reference-profile exact-source-v1`.
+Structured proposal source hashes and page indexes are constrained to the verified current
+PDF/page in the output schema and bound to the existing request/receipt digest. Returned and
+cached payloads are validated without rewriting them. Opaque `delta_json` source fields still
+use the unchanged independent integrity checks. Legacy is the default; absent controls keep
+legacy request bytes and policy bindings. A correction may introduce this profile only with
+an explicit `restart_main_step`, creating an assisted child with the inherited call ceiling.
+Provider schema failures retain their existing `invalid_output` handling. This prevents a
+specific structured transcription error; it does not establish assembly accuracy.
+
+Resume verifies a complete checkpoint-bound source page cache before repeating PDF preflight. It
+requires the same PDF, page bytes, dimensions, renderer parameters and resource limits; missing or
+untrusted proof follows ordinary validation. Historical recovery checks cancellation between receipts
+and instruction results. A single stalled operating-system read remains outside those cancellation
+boundaries. These availability changes preserve evidence and do not demonstrate an accuracy gain.
+
+Evaluation annotations are separate inputs for scoring. A previous assisted candidate is a comparison
+baseline, not independent ground truth. Unannotated identity, colour, placement and grouping values remain
+unknown. Keep source-reviewed annotations out of the unaided generator's inputs.
+
+The current exploration contract is `source-exploration-v4`. Candidate selection compares
+current-instruction concrete defects first, then compatible camera evidence. An honest uncertainty
+note is not a penalty; equivalent physical scenes retain their combined uncertainty. Missing reviews,
+ties and incomparable alternatives stay explicit. Old near-white silhouette scores cannot rank
+candidates: blue booklet and grey viewer backgrounds inflated those values. The new masks estimate
+border background, retain segmentation uncertainty and reject ambiguous/clipped/multiple-object
+comparisons. Image scores require a common source, crop, exclusions, mask policy and registered
+camera basis. An unscorable mask retains a fitted camera; only unavailable camera registration
+requires an overview.
+
+Snapshot visibility means presence in the assembly workspace, including pieces hidden behind other
+pieces. Source-pixel visibility is separate. Detached callouts may use their own workspace; active
+pieces identify new/moving/emphasized pieces rather than every visible instance.
+
+Policies and provider receipts are revision-bound. An older v2 run is preserved and cannot silently
+resume under a changed v3 contract. A new correction fork records the old/new policy hashes and
+inherits the shared budget. The first completed pilot used v2. A subsequent fresh v3
+baseline and a shared-index prompt challenger both completed; their results and limits
+are recorded in [`FIXED_MODEL_ACCURACY.md`](FIXED_MODEL_ACCURACY.md).
+
+```sh
+.venv/bin/python tools/engine.py fork-correction JOB_ID --request var/evidence/CORRECTION.json --revision accuracy-30669-repair-1
+```
+
+Correction requests bind the exact parent scene hash and official source evidence. They either apply
+explicit mapping, pose, rigid-group, attachment-grouping or landmark corrections, or restart at a main instruction with localized
+findings and later official views. At most two correction passes are allowed. Derived revisions preserve
+the parent's scene, prompts, render evidence and findings; descendant snapshots are regenerated. Corrected
+results retain their assisted lineage and do not replace the unaided result. Human review and physical
+build status remain separate.
+
+Source-guided requests (`restart_main_step` plus `guidance`, with no commands) also accept:
+
+- `context_page_indexes`: up to two unique zero-based page indexes, each cited in
+  the request's official `evidence`. Their order takes priority over the default
+  sorted later-page context. The target remains the first image; duplicate target
+  or previous-page images are omitted. This selects the later views that expose
+  the defect without supplying a finished assembly.
+- `max_panel_attempts`: either 1 or 2, never greater than the parent's normalized
+  exploration cap. Use 1 to spend at most one proposal and one visual-review call
+  per remaining panel. It does not reset or increase the shared model-call budget.
+
+Both controls are optional and recorded in correction lineage. Omitting them keeps
+existing behavior and request hashes. They are rejected for direct correction commands.
+
+An `op: "grouping"` command takes `step_id`, `group_id`, `reason` and `evidence` (the attachment's
+official `SourcePanel`). It changes only an `attach_subassembly` snapshot's group label to an existing
+earlier declared detached group. All group members must be visible and its receiving workspace must be
+unambiguous; unknown, incomplete or already attached groups are rejected. Grouping corrections do not
+change poses. When several labels are wrong, list their `grouping` commands in instruction order before
+any `group` pose commands, so rigid replay uses the corrected membership. Each correction invalidates
+dependent checks; evaluating the new revision refreshes affected renders without changing parent evidence.
+Unchanged prefix images may be reused only after scene, image and lineage verification. Every changed
+snapshot is rendered again. For before images, `--baseline` should point to a scene beside its original
+render receipts (for example the pinned parent job's `scene.json`); a scene-only export remains valid
+for numeric comparison but has no before pixels. Evaluation writes a new directory and prints a compact
+summary with paths to the full JSON report and source/before/after HTML.
+
+The completed first iteration and exact local preview commands are in
+[`ACCURACY_ITERATION.md`](ACCURACY_ITERATION.md).
+
+## Fixed-model prompt comparison
+
+`enqueue --proposal-profile attachment-reasoning` opts an **explore** job into the
+generic `attachment-reasoning-v1` proposal guidance. It clarifies complete physical
+group membership and source-supported receiving faces, targets and connector alternatives.
+It contains no set-specific part IDs, poses or accepted answers. The index/review prompts,
+schema, solver, rendering, ranking and resource limits are unchanged. The default
+`baseline` preserves existing request bytes and job deduplication.
+
+```sh
+.venv/bin/python tools/engine.py enqueue --set 30669 --guide alt-02 --execution-policy explore --model gpt-6-astra --reasoning high --max-model-calls 100 --proposal-profile attachment-reasoning --revision YOUR_NEW_PROMPT_EXPERIMENT
+```
+
+The profile name, version and exact prompt hash are recorded in the exploration policy.
+Changing them during resume fails before inference; use a new experiment instead.
+Correction forks inherit the selected profile and keep their assisted status. A prompt
+profile cannot be enabled for strict jobs. This option creates no production LLM usage
+and does not publish a candidate.
+
+The current comparison freezes the baseline implementation and initial source/individual-part
+cache. A paired run may reuse the baseline's authenticated automatic **source index only**,
+with its original indexing calls charged to both budgets and its reuse disclosed. No
+assembly, corrected pose or scoring annotation belongs in that input. Report such a
+comparison as shared-index assembly generation; a new end-to-end indexing trial is a
+separate measurement. Keep actual new calls, reused index calls and total charged calls
+distinct. See `var/evidence/fixed-model-30669-20261004/experiment.json` for run bindings.
+
+`enqueue --proposal-profile event-scoped` selects `event-scope-v1` for a fresh explore
+revision. It limits the proposal to the requested panel and explicitly listed callouts,
+permits an ambiguous region to remain unresolved without constructing its neighbours,
+and explains the existing sequence/action/group contract. All replacement and appended
+wording is hashed in the policy. The queue, source checks, solver, renderer and call limits
+remain unchanged; baseline and attachment-reasoning requests retain their original bytes.
+This is prompt guidance, and its accuracy effect must be measured from actual output.
 
 ## Run
 
@@ -310,3 +473,50 @@ alpha continuation is not relabelled as an unassisted automatic conversion.
 Fast alpha campaign commands: `.venv/bin/python tools/alpha_campaign.py status`; `.venv/bin/python tools/alpha_campaign.py run` (selected campaign IDs only, --skip-set may freeze source-assisted prefixes); `.venv/bin/python tools/preview_alpha.py --campaign-file var/evidence/alpha-ten-set/campaign.json` (read-only loopback preview, no publication/review authority).
 
 `correct-empty-batch --set N --guide ID --source-review PATH` is a separately labelled agent correction for a rejected batch of genuinely noninstruction pages, never a way to reset inference attempts. The typed review must bind actual source/page hashes, actor and non_instruction classifications. The backend removes only false blockers, preserves all parts/poses/source observations and original trial/counter history, then normal receipt replay advances one batch with inference disabled. It cannot clear geometry/schema/security failures or grant assembly/human approval. `register-assisted` validates full source coverage, real individual assets and any accepted-prefix lineage, then leases the selected job for a frozen assisted import. Failed imports/corrections release their own lease and retain attempts.
+# Accuracy mechanism update — 4 October 2026
+
+Fresh exploration uses `source-exploration-v4`; fresh fast alpha uses
+`source-direct-alpha-v2`. These versions freeze semantic source routing, localized
+feedback, hypothesis/geometry diagnostics and the model/reasoning choice. Saved
+scenes remain viewable; a frozen job cannot silently resume under a different
+policy. New correction revisions carry authenticated canonical source-index seeds,
+preserve legacy uncertainty and verify actual source pixels on resume. V2 parent
+cursors must match the normalized event queue; incompatible legacy callout prefixes
+require a restart from the first instruction.
+
+The model remains `gpt-6-astra` / `high`. No inference is added to production
+playback. Measured offline results, software validation and remaining accuracy
+limits are recorded in `ENGINE_ACCURACY_IMPROVEMENTS.md`.
+
+An exploration correction can carry at most two explicit `source_only_index_reviews`.
+Each agent review must cite a whole official page and authenticate its unchanged empty
+V2 index, cached PNG, failed request/receipt and exact nonzero process result with no
+structured output. This admits only a retained `provider_unavailable` failure; integrity,
+authentication, quota, nonempty-index and forged evidence failures still reject. The
+canonical acknowledgement is stored separately in `source-index-reviews.json` and
+authenticated through later correction seeds. It never replaces the raw source index,
+removes its uncertainty, resets call counts or grants human/physical approval. Requests
+without this optional field retain their previous canonical hash.
+
+
+# Local engine activity logs — 5 October 2026
+
+`run`, `watch` and `step` now emit timestamped INFO activity on stderr while keeping JSON results on stdout. A read-only observer polls existing durable events/checkpoints once per second: source indexing, model-call reservations/receipts, trial/render outcomes, repair decisions, provisional selections, saved coverage and blockers. Summaries distinguish processed instructions from reconstructed instructions and report source events including callouts when those counters are available. Findings are diagnostics, not accuracy or approval claims. Unknown counters stay `?`.
+
+```sh
+# Observe a job already running in another terminal, without starting a worker.
+.venv/bin/python tools/engine.py --data-dir var/experiments/next-nine-20261005/data logs JOB_ID --follow
+
+# One current progress snapshot.
+.venv/bin/python tools/engine.py --data-dir var/experiments/next-nine-20261005/data logs JOB_ID
+
+# Quieter future worker; global options precede the command.
+.venv/bin/python tools/engine.py --log-level WARNING run --job-id JOB_ID
+
+# Optionally retain readable activity in addition to the existing durable events.
+.venv/bin/python tools/engine.py run --job-id JOB_ID 2>> var/engine-activity.log
+```
+
+A follower starts with the current saved progress and shows newly committed events; it does not replay old event history. It reports a long unchanged checkpoint at most every 30 seconds, labels an expired lease explicitly, and exits once the job is paused, blocked, cancelled or otherwise stopped with its lease released. Ctrl-C stops only the follower. It never claims, cancels, resumes, migrates or rewrites the observed job, and never opens candidate/source/render files. Prompt text, model response bodies and arbitrary error messages are excluded. Logging failures warn once and retry without stopping reconstruction. Logs describe saved phases; very short intermediate phases can be represented by their event messages before a later progress summary.
+
+The current Terminal worker keeps its already loaded CLI. Automatic logs apply to new worker processes; use `logs --follow` to observe the existing job without a restart. No inference policy, model, budget, prompt, scene or viewer contract changed.

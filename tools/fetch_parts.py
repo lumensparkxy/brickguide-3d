@@ -147,6 +147,40 @@ def fetch_parts(part_ids: list[str], directory: Path) -> dict:
     return manifest
 
 
+
+def stage_individual(part_id, stage, verified_caches, check=lambda: None, *, stage_budget=None):
+    """Opt-in unpublished read-through acquisition; legacy fetch_parts is unchanged."""
+    from guide2build.reconstruction.individual_closure import closure
+    with httpx.Client(timeout=30, follow_redirects=False, headers={"Accept-Encoding": "identity"}) as client:
+        def acquire(path, deadline, tick):
+            if not SAFE.fullmatch(path):
+                raise ValueError("Unsafe individual resource path")
+            for attempt in range(3):
+                tick()
+                time.sleep(0.4)
+                with client.stream("GET", BASE + path) as response:
+                    if str(response.url) != BASE + path or str(response.request.url) != BASE + path:
+                        raise ValueError("Unexpected individual response origin")
+                    if response.status_code == 429 and attempt < 2:
+                        raw_delay = response.headers.get("retry-after", "10")
+                        delay = int(raw_delay) if raw_delay.isdigit() else 10
+                        time.sleep(min(30, max(10, delay)))
+                        continue
+                    response.raise_for_status()
+                    if response.headers.get("content-encoding", "identity").lower() != "identity":
+                        raise ValueError("Compressed part responses are not accepted")
+                    chunks, size = [], 0
+                    for chunk in response.iter_bytes():
+                        tick()
+                        size += len(chunk)
+                        if size > 1_000_000:
+                            raise ValueError("Individual resource exceeds byte limit")
+                        chunks.append(chunk)
+                    return b"".join(chunks)
+            raise RuntimeError("Bounded individual acquisition returned no response")
+        return closure(part_id, stage, verified_caches, acquire, references, check, stage_budget=stage_budget)
+
+
 def fetch_materials(directory: Path) -> dict:
     destination = directory / "LDConfig.ldr"
     manifest_path = directory / "provenance.json"

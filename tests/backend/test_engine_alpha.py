@@ -69,9 +69,13 @@ def environment(tmp_path, monkeypatch):
            "config": {"generation_mode": "alpha_fast", "alpha_page_batch_size": 4, "max_chunk_attempts": 5}}
     checkpoint = {}
     saves = []
+    snapshot_stages = set()
     def save(stage, state="constructing", error=None):
         checkpoint["stage"] = stage
-        saves.append({"stage": stage, "state": state, "error": error, "checkpoint": deepcopy(checkpoint)})
+        event = {"stage": stage, "state": state, "error": error}
+        if stage in snapshot_stages:
+            event["checkpoint"] = deepcopy(checkpoint)
+        saves.append(event)
     def geometry(scene, target, shared):
         target.mkdir(parents=True, exist_ok=True)
         records = {}
@@ -93,7 +97,7 @@ def environment(tmp_path, monkeypatch):
         return {"status": "synthetic_asset_test_only"}
     monkeypatch.setattr(alpha, "prepare_geometry", geometry)
     return SimpleNamespace(store=SimpleNamespace(data_dir=tmp_path), job=job, checkpoint=checkpoint,
-                           directory=directory, pages=pages, save=save, saves=saves,
+                           directory=directory, pages=pages, save=save, saves=saves, snapshot_stages=snapshot_stages,
                            heartbeat=SimpleNamespace(check=lambda: None), guide=guide)
 
 
@@ -142,6 +146,150 @@ def test_model_schema_is_strict_and_compact():
         assert bbox["items"]["minimum"] == 0 and bbox["items"]["maximum"] == 1
 
 
+def explicit_panel(kind="main", number=1, *, role="build_event", key="main-1", bbox=None, parent=None):
+    return {"section": "booklet-01-main", "number": number, "label": str(number) if number else "Overview",
+        "bbox": bbox or [0, 0, 1, 1], "kind": kind, "region_id": key, "role": role,
+        "event_key": key if role == "build_event" else None, "associated_event": parent,
+        "semantic_status": "explicit", "evidence": "Original synthetic source declares this region and its role.",
+        "uncertainty": []}
+
+
+def normalized_regions(h, value):
+    parsed = alpha.AlphaPatch.model_validate(value)
+    return alpha._alpha_regions(parsed, job=h.job, checkpoint=h.checkpoint, source_hash=SOURCE,
+        bindings=alpha._page_bindings(h.pages, [page.page_index for page in parsed.page_observations]))
+
+
+def test_source_only_overview_is_retained_and_later_batch_builds(environment):
+    h = environment
+    first = patch()
+    for key in ("new_sections", "new_instances", "new_steps", "quantity_evidence"):
+        first[key] = []
+    first["page_observations"][0]["panels"] = [explicit_panel("attachment", None, role="overview", key="overview")]
+    provider = SequenceProvider([first, patch((4, 5, 6, 7))])
+    scene = generate(h, provider)
+    assert scene and len(scene.instances) == 1 and len(provider.calls) == 2
+    assert h.checkpoint["alpha_completed_pages"] == 8
+    regions = h.checkpoint["alpha_region_index"]
+    assert len(regions["retained_regions"]) == 2
+    assert regions["retained_regions"][0]["disposition"] == "source_only_overview"
+    assert regions["summary"]["reconstruction_regions"] == 1
+    assert '"source_region_associations":' in provider.calls[1]["prompt"]
+
+
+@pytest.mark.parametrize("mutation", ["empty", "foreign", "queue", "patch"])
+def test_semantic_index_cannot_bypass_source_coverage(environment, mutation):
+    h = environment
+    value = patch()
+    value["page_observations"][0]["panels"] = [explicit_panel()]
+    index = normalized_regions(h, value)
+    if mutation == "empty":
+        index = {"reconstruction_panels": []}
+    elif mutation == "foreign":
+        index["source"]["source_sha256"] = "b" * 64
+    elif mutation == "queue":
+        index["reconstruction_panels"] = []
+        index["normalization_sha256"] = digest({key: val for key, val in index.items() if key != "normalization_sha256"})
+    else:
+        value["page_observations"][0]["panels"][0]["bbox"] = [.1, .1, .9, .9]
+    with pytest.raises(ValueError, match="semantic source index"):
+        alpha.expand_alpha_patch(value, job=h.job, source_hash=SOURCE, page_count=8,
+                                 page_indexes=(0, 1, 2, 3), region_index=index)
+
+
+def callout_patch(parent_kind="main", child_number=1):
+    value = patch()
+    value["page_observations"][0]["panels"] = [
+        explicit_panel(parent_kind, bbox=[0, .5, 1, 1]),
+        explicit_panel("substep", child_number, key="callout-1", bbox=[0, 0, 1, .4],
+                       parent={"page_index": 0, "event_key": "main-1"})]
+    value["new_steps"][0]["source"]["bbox"] = [0, .5, 1, 1]
+    child = deepcopy(value["new_steps"][0])
+    child.update(step_id="synthetic-callout-1", action="build_subassembly", assembly_group_id="synthetic-group",
+                 substep_label="1", visibility="explicit", visible_instance_ids=["synthetic-a"])
+    child["source"]["bbox"] = [0, 0, 1, .4]
+    value["new_steps"][0].update(action="attach_subassembly", assembly_group_id="synthetic-group", introduced_instance_ids=[])
+    value["new_steps"].insert(0, child)
+    return value
+
+
+@pytest.mark.parametrize("parent_kind", ["main", "attachment"])
+def test_numbered_callouts_need_distinct_source_snapshots(environment, parent_kind):
+    h = environment
+    value = callout_patch(parent_kind)
+    index = normalized_regions(h, value)
+    scene = alpha.expand_alpha_patch(value, job=h.job, source_hash=SOURCE, page_count=8,
+                                    page_indexes=(0, 1, 2, 3), region_index=index)
+    assert len(scene.instances) == 1 and len(scene.steps) == 2
+    value["new_steps"].pop(0)
+    value["new_steps"][0].update(action="add_parts", assembly_group_id=None, introduced_instance_ids=["synthetic-a"])
+    with pytest.raises(ValueError, match="panels disagree"):
+        alpha.expand_alpha_patch(value, job=h.job, source_hash=SOURCE, page_count=8,
+                                 page_indexes=(0, 1, 2, 3), region_index=index)
+
+
+def test_distinct_main_regions_cannot_share_one_snapshot(environment):
+    h = environment
+    value = patch()
+    value["page_observations"][0]["panels"] = [explicit_panel(bbox=[0, 0, .45, 1]),
+        explicit_panel(key="another-main-1", bbox=[.55, 0, 1, 1])]
+    value["new_steps"][0]["source"]["bbox"] = [0, 0, .45, 1]
+    index = normalized_regions(h, value)
+    fresh = alpha._alpha_fresh_region_findings(index, alpha._page_bindings(h.pages, range(4)))
+    assert any(item["code"] == "source_main_number_repeated" for item in fresh)
+    with pytest.raises(ValueError, match="unmatched_required_region_count"):
+        alpha.expand_alpha_patch(value, job=h.job, source_hash=SOURCE, page_count=8,
+                                 page_indexes=(0, 1, 2, 3), region_index=index)
+
+
+@pytest.mark.parametrize("field", ["alpha_page_observations", "alpha_review_notes", "alpha_region_index"])
+def test_completed_source_context_is_bound_to_accepted_receipts(environment, field):
+    h = environment
+    generate(h, SequenceProvider([patch()]), max_chunks=1)
+    if field == "alpha_page_observations":
+        h.checkpoint[field][0]["panels"][0]["role"] = "overview"
+    elif field == "alpha_review_notes":
+        h.checkpoint[field].append({"code": "fabricated", "message": "Unbound finding"})
+    else:
+        h.checkpoint[field]["summary"]["source_only_regions"] = 999
+    provider = SequenceProvider([patch((4, 5, 6, 7), number=2, identity="synthetic-b", section=False)])
+    with pytest.raises(ValueError, match="authenticated receipts"):
+        generate(h, provider)
+    assert not provider.calls
+
+
+def test_latest_alpha_rejection_survives_old_quality_noise():
+    candidate = {"steps": [{"step_id": "known-step", "active_instance_ids": ["known-part"]}]}
+    notes = [{"code": "wrong_side", "severity": "error", "step_id": "known-step",
+              "instance_ids": ["known-part"], "message": f"Earlier quality finding {index}"} for index in range(30)]
+    rejected = [{"code": "invalid_alpha_patch", "message": "Current source instruction is missing."}]
+    feedback = alpha._alpha_feedback({"alpha_review_notes": notes}, candidate, rejected)
+    assert feedback["latest_rejection"] == rejected[-1]
+    assert feedback["rejected_history_sha256"] == digest(rejected)
+
+
+def test_alpha_diagnostic_findings_continue_and_survive_resume(environment, monkeypatch):
+    from guide2build.engine import hypotheses
+    h = environment
+    def diagnostic(scene, previous, geometry, *, checked_step_ids):
+        return {"findings": [{"code": "symmetric_coincident_geometry", "severity": "error",
+            "step_id": checked_step_ids[-1], "instance_ids": ["synthetic-a"], "message": "Synthetic diagnostic only."}],
+            "coverage": {"status": "partial"}, "findings_truncated": False}
+    monkeypatch.setattr(hypotheses, "diagnose_candidate", diagnostic)
+    provider = SequenceProvider([patch()])
+    generate(h, provider, max_chunks=1)
+    first_notes = deepcopy(h.checkpoint["alpha_review_notes"])
+    assert any(item.get("code") == "symmetric_coincident_geometry" for item in first_notes)
+    following = SequenceProvider([patch((4, 5, 6, 7), number=2, identity="synthetic-b", section=False)])
+    scene = generate(h, following)
+    assert scene and h.checkpoint["alpha_completed_pages"] == 8 and len(following.calls) == 1
+    assert h.checkpoint["alpha_review_notes"][:len(first_notes)] == first_notes
+    assert "Synthetic diagnostic only." in following.calls[0]["prompt"]
+    region_first = [item for item in first_notes if item.get("code") == "legacy_semantics_unclassified"]
+    region_all = [item for item in h.checkpoint["alpha_review_notes"] if item.get("code") == "legacy_semantics_unclassified"]
+    assert len(region_first) == 1 and len(region_all) == 2  # Prior normalization is not appended twice.
+
+
 def test_append_only_expansion_inherits_poses_and_preserves_previous(environment):
     h = environment
     first = expand(h, patch()).model_dump(mode="json")
@@ -169,6 +317,12 @@ def test_callout_attachment_and_multiplier_reuse_physical_ids(environment):
                   visibility="explicit", visible_instance_ids=["synthetic-b"])
     attached = step("synthetic-attachment", 1, ids=["synthetic-a", "synthetic-b"], introduced=[])
     attached.update(action="attach_subassembly", assembly_group_id="synthetic-group-a")
+    first["source"]["bbox"] = [0, 0, .4, .4]
+    second["source"]["bbox"] = [.6, 0, 1, .4]
+    attached["source"]["bbox"] = [0, .5, 1, 1]
+    value["page_observations"][0]["panels"][0]["bbox"] = attached["source"]["bbox"]
+    value["page_observations"][0]["panels"].extend({"section": "booklet-01-main", "number": 1,
+        "label": "1", "bbox": item["source"]["bbox"], "kind": "substep"} for item in [first, second])
     value["new_steps"].extend([second, attached])
     value["quantity_evidence"] = [{"step_id": attached["step_id"], "source": region(), "printed_quantity": 2,
         "unit": "assembly_group", "physical_units": [["synthetic-a"], ["synthetic-b"]],
@@ -366,6 +520,63 @@ def exhausted_empty_batch(h):
     return state
 
 
+def test_trailing_assisted_empty_batch_retains_semantic_index_on_second_resume(environment):
+    from pathlib import Path
+    h = environment
+    assert generate(h, SequenceProvider([patch()]), max_chunks=1) is not None
+    empty = patch((4, 5, 6, 7))
+    empty.update(new_sections=[], new_instances=[], new_steps=[], quantity_evidence=[], blockers=["Synthetic trailing cover blocker."])
+    for observation in empty["page_observations"]:
+        observation["panels"] = []
+    failed = SequenceProvider([empty] * 5)
+    generate(h, failed)
+    state = h.checkpoint["alpha_chunks"]["1"]
+    assert len(failed.calls) == state["used"] == 5
+    review = source_review(h)
+    review["pages"] = [{"page_index": index, "sha256": hashlib.sha256((h.pages / f"page-{index:03d}.png").read_bytes()).hexdigest(),
+        "classification": "non_instruction", "description": "Original synthetic trailing noninstruction image."}
+        for index in range(4, 8)]
+    receipt = alpha.accept_alpha_correction(job=h.job, checkpoint=h.checkpoint, directory=h.directory,
+        source_hash=SOURCE, pages_dir=h.pages, page_count=8, rejected_trial=Path(state["trials"][-1]),
+        source_review=review, save=h.save, heartbeat=h.heartbeat)
+    assert {"region-index.json", "region-findings.json"} <= set(receipt["files"])
+    provider = SequenceProvider([])
+    first = generate(h, provider)
+    before = deepcopy(h.checkpoint)
+    second = generate(h, provider)
+    assert first == second and not provider.calls
+    assert h.checkpoint["alpha_region_index"] == before["alpha_region_index"]
+    assert h.checkpoint["alpha_page_observations"] == before["alpha_page_observations"]
+    assert h.checkpoint["alpha_review_notes"] == before["alpha_review_notes"]
+
+
+def test_rebound_alpha_candidate_cannot_replace_immutable_accepted_history(environment):
+    from pathlib import Path
+    h = environment
+    generate(h, SequenceProvider([patch()]), max_chunks=1)
+    accepted = h.checkpoint["alpha_chunks"]["0"]["accepted"]
+    original = (Path(accepted["directory"]) / "accepted.json").read_bytes()
+    h.checkpoint["candidate"]["steps"][0]["poses"]["synthetic-a"]["position_ldu"][0] += 10
+    accepted["scene_sha256"] = digest(h.checkpoint["candidate"])
+    provider = SequenceProvider([patch((4, 5, 6, 7), number=2, identity="synthetic-b", section=False)])
+    with pytest.raises(ValueError, match="immutable receipt"):
+        generate(h, provider)
+    assert not provider.calls
+    assert (Path(accepted["directory"]) / "accepted.json").read_bytes() == original
+
+
+@pytest.mark.parametrize("key,value", [("model", "synthetic-different-model"), ("reasoning", "low")])
+def test_alpha_runtime_choice_cannot_change_partway_through_frozen_run(environment, key, value):
+    h = environment
+    generate(h, SequenceProvider([patch()]), max_chunks=1)
+    candidate = deepcopy(h.checkpoint["candidate"])
+    h.job["config"][key] = value
+    provider = SequenceProvider([])
+    with pytest.raises(ValueError, match="Frozen alpha source, policy"):
+        generate(h, provider)
+    assert not provider.calls and h.checkpoint["candidate"] == candidate
+
+
 def source_review(h):
     return {"actor_type": "agent", "actor_id": "synthetic-source-inspector", "source_sha256": SOURCE,
         "reason": "Original synthetic white pages contain no instruction panel; later pages remain unprocessed.",
@@ -414,6 +625,7 @@ def test_agent_empty_batch_correction_preserves_exhausted_trials_and_replays_wit
 def test_agent_correction_receipt_is_committed_before_promotion_and_recovers_after_interruption(environment):
     h = environment
     exhausted_empty_batch(h)
+    h.snapshot_stages.add("alpha_source_observation_corrected")
     class CommittedCrash(RuntimeError):
         pass
     def committed_save(stage, state="constructing", error=None):
@@ -655,6 +867,7 @@ def test_dedicated_alpha_geometry_cache_used_when_present(environment, monkeypat
 
 def test_actual_page_hashes_are_retained_in_accepted_receipt(environment):
     h = environment
+    h.snapshot_stages.add("alpha_constructing_chunk")
     scene = generate(h, SequenceProvider([patch()]), max_chunks=1)
     accepted = h.checkpoint["alpha_chunks"]["0"]["accepted"]
     assert accepted["scene_sha256"] == digest(scene)
@@ -834,7 +1047,7 @@ def test_partial_catalogue_does_not_prevent_host_resolving_a_source_identified_d
             assert "Each call is one partial booklet batch" in prompt
             assert "absence of assembly panels" in prompt
             assert "blockers=[]" in prompt and "host advances to the next batch" in prompt
-            body = json.loads(prompt[len(alpha.POLICY) + 1:])
+            body = json.loads(prompt[prompt.index('{"set_number"'):])
             assert body["input_image_dimensions"] == [{"page_index": index, "width_pixels": 32,
                 "height_pixels": 24, "bbox_units": "full_page_normalized_left_top_right_bottom"}
                 for index in range(4)]

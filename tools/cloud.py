@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 import urllib.request
 import urllib.error
+from urllib.parse import urlsplit
 import certifi
 import xml.etree.ElementTree as ET
 from decimal import Decimal, ROUND_DOWN
@@ -86,6 +87,66 @@ def project_role(principal, role, database=None):
 def bucket_role(bucket, principal, role):
     gcloud('storage', 'buckets', 'add-iam-policy-binding', 'gs://' + bucket,
            '--member=' + principal, '--role=' + role)
+
+
+def service_origins(service):
+    """Use advertised Cloud Run origins, including both aliases and active tags."""
+    metadata = service.get('metadata', {})
+    name = metadata.get('name')
+    if name not in (CFG['public_service'], CFG['preview_service']):
+        raise RuntimeError('Unexpected service in asset CORS configuration')
+    try:
+        advertised = json.loads(metadata.get('annotations', {}).get('run.googleapis.com/urls', '[]'))
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError('Invalid Cloud Run URL metadata') from exc
+    if not isinstance(advertised, list):
+        raise RuntimeError('Invalid Cloud Run URL metadata')
+    status = service.get('status', {})
+    urls = [status.get('url'), *advertised,
+            *(entry['url'] for entry in status.get('traffic', []) if entry.get('url'))]
+    origins = set()
+    for value in urls:
+        if not isinstance(value, str):
+            raise RuntimeError('Missing or invalid Cloud Run origin')
+        url = urlsplit(value)
+        hostname = url.hostname or ''
+        service_host = hostname.split('---')[-1]
+        if (url.scheme != 'https' or url.netloc != hostname or not hostname.endswith('.run.app')
+                or not service_host.startswith(name + '-') or url.path not in ('', '/')
+                or url.query or url.fragment):
+            raise RuntimeError('Unsafe Cloud Run origin in asset CORS configuration')
+        origins.add('https://' + hostname)
+    return sorted(origins)
+
+
+def configure_asset_cors():
+    """Repair the existing public asset bucket without rebuilding or publishing."""
+    services = [gcloud('run', 'services', 'describe', name, '--region=' + CFG['region'])
+                for name in (CFG['public_service'], CFG['preview_service'])]
+    origins = sorted({origin for service in services for origin in service_origins(service)})
+    desired = [{'origin': origins, 'method': ['GET', 'HEAD'],
+                'responseHeader': ['Content-Type', 'ETag'], 'maxAgeSeconds': 3600}]
+    bucket = 'gs://' + CFG['assets_bucket']
+    # Formatted gcloud metadata omits the project owner; use raw API keys.
+    before = gcloud('storage', 'buckets', 'describe', bucket, '--raw')
+    if before.get('name') != CFG['assets_bucket'] or str(before.get('projectNumber')) != CFG['project_number']:
+        raise RuntimeError('Asset bucket is not owned by the selected project')
+    previous = before.get('cors', [])
+    save('cors-before.json', previous)
+    save('cors.json', desired)
+    # The provider may reorder origins or headers in its readback.
+    def normalized(rules):
+        return sorted(json.dumps({key: sorted(value) if isinstance(value, list) else value
+                                  for key, value in rule.items()}, sort_keys=True) for rule in rules)
+    changed = normalized(previous) != normalized(desired)
+    if changed:
+        gcloud('storage', 'buckets', 'update', bucket, '--cors-file=' + str(EVIDENCE / 'cors.json'))
+    after = gcloud('storage', 'buckets', 'describe', bucket, '--raw')
+    if normalized(after.get('cors', [])) != normalized(desired):
+        raise RuntimeError('Asset CORS configuration could not be verified')
+    result = {'origins': origins, 'changed': changed, 'verified': True}
+    save('cors-readback.json', result)
+    return result
 
 
 def provision():
@@ -225,6 +286,11 @@ def deploy(preview_only=False, build_id=None):
                         '--set-env-vars=' + env, '--labels=app=guide2build',
                         '--allow-unauthenticated' if public else '--no-allow-unauthenticated', *rollout_args)
         save(service + '-deployed.json', result)
+        # Configure all real aliases/tags before smoke checks or a traffic shift.
+        # The initial preview deployment can precede creation of the public service.
+        if public or gcloud('run', 'services', 'describe', CFG['public_service'],
+                            '--region=' + CFG['region'], check=False) is not None:
+            configure_asset_cors()
         if previous and public:
             tagged = next(t['url'] for t in result['status']['traffic'] if t.get('tag') == 'verify-' + revision[:12])
             smoke(tagged)
@@ -250,10 +316,6 @@ def deploy(preview_only=False, build_id=None):
                 gcloud('run', 'services', 'remove-iam-policy-binding', CFG['public_service'],
                        '--region=' + CFG['region'], '--member=allUsers', '--role=roles/run.invoker')
             raise
-        cors = EVIDENCE / 'cors.json'
-        cors.write_text(json.dumps([{'origin': [public, preview], 'method': ['GET', 'HEAD'],
-                                     'responseHeader': ['Content-Type', 'ETag'], 'maxAgeSeconds': 3600}]))
-        gcloud('storage', 'buckets', 'update', 'gs://' + CFG['assets_bucket'], '--cors-file=' + str(cors))
         save('live.json', {'url': public, 'preview_url': preview, 'revision': revision, 'image': image})
         print('Public website:', public)
 
@@ -289,7 +351,7 @@ def rollback():
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('command', choices=('preflight', 'provision', 'budget', 'deploy', 'preview', 'rollback'))
+    p.add_argument('command', choices=('preflight', 'provision', 'budget', 'deploy', 'preview', 'rollback', 'asset-cors'))
     p.add_argument('--apply', action='store_true', help='Execute approved cloud mutations')
     p.add_argument('--build-id', help='Resume deploy/preview from a successful existing build with unchanged application inputs')
     args = p.parse_args()
@@ -306,6 +368,9 @@ def main():
             budget()
         elif args.command == 'rollback':
             rollback()
+        elif args.command == 'asset-cors':
+            account_gate()
+            print(json.dumps(configure_asset_cors(), indent=2))
         else:
             deploy(preview_only=args.command == 'preview', build_id=args.build_id)
     except (RuntimeError, subprocess.CalledProcessError, OSError, ValueError) as e:

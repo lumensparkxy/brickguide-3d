@@ -11,6 +11,8 @@ import sys
 import tempfile
 import time
 import uuid
+import stat
+from io import BytesIO
 from contextlib import contextmanager
 from collections.abc import Callable
 from importlib.metadata import version
@@ -227,6 +229,8 @@ def _render_batch(pdf_path: Path, output_dir: Path, scale: float, start: int, st
 
 def _child(pdf_path: Path, staging: Path, scale: float, operation: str,
            check_cancel: CancelCheck, start: int = 0, stop: int = 0) -> list[dict]:
+    if operation not in {"preflight", "batch"}:
+        raise ValueError("Unknown PDF child operation")
     process = subprocess.Popen(
         [sys.executable, str(Path(__file__).resolve()), str(pdf_path.resolve()), str(staging),
          str(scale), operation, str(start), str(stop)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -236,11 +240,11 @@ def _child(pdf_path: Path, staging: Path, scale: float, operation: str,
         while process.poll() is None:
             _check(check_cancel)
             if time.monotonic() >= deadline:
-                raise TimeoutError("PDF rendering exceeded batch time limit")
+                raise TimeoutError(f"PDF rendering exceeded batch time limit (operation={operation})")
             time.sleep(0.1)
         _check(check_cancel)
         if process.returncode:
-            raise ValueError("PDF rendering failed or exceeded resource limits")
+            raise ValueError(f"PDF rendering failed or exceeded resource limits (operation={operation})")
         return json.loads((staging / "result.json").read_text())
     finally:
         if process.poll() is None:
@@ -311,10 +315,264 @@ def _invalidate_render_manifests(output_dir: Path) -> None:
         (output_dir / name).unlink(missing_ok=True)
 
 
+def _cache_path_identity(path: Path):
+    """Bind regular files/directories and their non-symlink ancestry, without ctime assumptions."""
+    path = path.absolute()
+    if path.resolve() != path:
+        raise ValueError("Trusted source cache paths must not contain symlinks")
+    identities = []
+    for item in [path, *path.parents]:
+        info = item.lstat()
+        if item == path:
+            if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+                raise ValueError("Trusted source cache requires regular paths")
+        elif not stat.S_ISDIR(info.st_mode):
+            raise ValueError("Trusted source cache ancestry must be directories")
+        identities.append((info.st_dev, info.st_ino, info.st_mode))
+    return tuple(identities)
+
+
+@contextmanager
+def _open_cache_file(path: Path):
+    """Open under held no-follow directory descriptors; FIFOs cannot block leaf admission."""
+    path = path.absolute()
+    if ".." in path.parts:
+        raise ValueError("Trusted source cache paths cannot traverse parents")
+    descriptors, identities = [], []
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    try:
+        descriptor = os.open(path.anchor, flags | os.O_DIRECTORY)
+        descriptors.append(descriptor)
+        info = os.fstat(descriptor)
+        identities.append((info.st_dev, info.st_ino, info.st_mode))
+        for component in path.parts[1:-1]:
+            descriptor = os.open(component, flags | os.O_DIRECTORY, dir_fd=descriptor)
+            descriptors.append(descriptor)
+            info = os.fstat(descriptor)
+            identities.append((info.st_dev, info.st_ino, info.st_mode))
+        descriptor = os.open(path.name, flags, dir_fd=descriptor)
+        descriptors.append(descriptor)
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("Trusted source cache requires regular file leaves")
+        identities.append((info.st_dev, info.st_ino, info.st_mode))
+        yield descriptor, tuple(reversed(identities)), info
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+@contextmanager
+def _trusted_cache_lock(path: Path, check_cancel: CancelCheck):
+    """A complete cached render already has a lock; do not create or follow a new leaf."""
+    import fcntl
+    started = time.monotonic()
+    with _open_cache_file(path) as (descriptor, identity, _):
+        while True:
+            _check(check_cancel)
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() - started > DOWNLOAD_SECONDS:
+                    raise TimeoutError("Source lock wait exceeded time limit")
+                time.sleep(0.1)
+        try:
+            if _cache_path_identity(path) != identity:
+                raise ValueError("Trusted source cache lock path changed")
+            yield
+            if _cache_path_identity(path) != identity:
+                raise ValueError("Trusted source cache lock path changed")
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+
+
+def _cache_read(path: Path, limit: int, observed: dict, check_cancel: CancelCheck, *, keep_bytes=False,
+                expected_prefix: bytes | None = None):
+    chunks, size, digest = [], 0, hashlib.sha256()
+    with _open_cache_file(path) as (descriptor, identity, info):
+        if not 0 < info.st_size <= limit:
+            raise ValueError("Trusted source cache file is missing, invalid or oversized")
+        while True:
+            _check(check_cancel)
+            chunk = os.read(descriptor, min(1024 * 1024, limit + 1 - size))
+            if not chunk:
+                break
+            if size == 0 and expected_prefix is not None and not chunk.startswith(expected_prefix):
+                raise ValueError("Trusted source cache content signature is invalid")
+            size += len(chunk)
+            if size > limit:
+                raise ValueError("Trusted source cache file exceeded its limit")
+            digest.update(chunk)
+            if keep_bytes:
+                chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (size != info.st_size or (after.st_dev, after.st_ino, after.st_mode, after.st_size)
+                != (info.st_dev, info.st_ino, info.st_mode, info.st_size)
+                or _cache_path_identity(path) != identity):
+            raise ValueError("Trusted source cache file changed during verification")
+    pin = (identity, digest.hexdigest(), size, limit)
+    if path in observed and observed[path] != pin:
+        raise ValueError("Trusted source cache bytes changed during verification")
+    observed[path] = pin
+    return b"".join(chunks) if keep_bytes else digest.hexdigest()
+
+
+def _cache_bytes(path: Path, limit: int, observed: dict, check_cancel: CancelCheck) -> bytes:
+    return _cache_read(path, limit, observed, check_cancel, keep_bytes=True)
+
+
+def _cache_json(path: Path, observed: dict, check_cancel: CancelCheck, *, limit=8 * 1024 * 1024):
+    def unique(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("Duplicate trusted source cache metadata key")
+            result[key] = value
+        return result
+
+    def invalid_constant(_):
+        raise ValueError("Nonfinite trusted source cache metadata")
+
+    return json.loads(_cache_bytes(path, limit, observed, check_cancel),
+                      object_pairs_hook=unique, parse_constant=invalid_constant)
+
+
+def validate_trusted_page_bindings(proof, expected_sha256: str | None = None) -> dict:
+    """Validate/copy only existing bounded checkpoint scalars, before any cache lookup."""
+    if not isinstance(proof, dict) or set(proof) != {"source_sha256", "page_count", "pages"}:
+        raise ValueError("Trusted source-page proof is malformed")
+    count, bindings = proof["page_count"], proof["pages"]
+    if (not isinstance(proof["source_sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", proof["source_sha256"])
+            or expected_sha256 is not None and proof["source_sha256"] != expected_sha256
+            or type(count) is not int
+            or not 0 < count <= MAX_PAGES or not isinstance(bindings, list) or len(bindings) != count):
+        raise ValueError("Trusted source-page proof lacks complete matching source coverage")
+    # Copy only bounded validated scalar fields; caller mutation cannot change the fence.
+    trusted = []
+    for index, binding in enumerate(bindings):
+        if (not isinstance(binding, dict) or set(binding) != {"page_index", "sha256", "width", "height"}
+                or type(binding["page_index"]) is not int or binding["page_index"] != index
+                or not isinstance(binding["sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", binding["sha256"])
+                or type(binding["width"]) is not int or type(binding["height"]) is not int
+                or min(binding["width"], binding["height"]) <= 0
+                or binding["width"] * binding["height"] > min(PAGE_PIXELS, BATCH_PIXELS)):
+            raise ValueError("Trusted source-page proof has invalid ordered page bindings")
+        trusted.append(dict(binding))
+    return {"source_sha256": proof["source_sha256"], "page_count": count, "pages": trusted}
+
+
+def checkpoint_source_receipt(pdf_path: Path, expected_url: str, expected_sha256: str,
+                              check_cancel: CancelCheck = None) -> dict:
+    """Require the existing official receipt and exact checkpoint PDF; never download/repair.
+
+    This source-only entry is descriptor-safe before legacy cache readers can be called.
+    The existing SourceReceipt contract remains authoritative; it is not expanded here.
+    """
+    from .jobs.source_cache import SourceReceipt
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_sha256):
+        raise ValueError("Checkpoint-bound source requires a valid existing SHA-256")
+    validate_pdf_url(expected_url)
+    observed = {}
+    raw = _cache_json(pdf_path.with_suffix(".receipt.json"), observed, check_cancel, limit=64 * 1024)
+    try:
+        receipt = SourceReceipt.model_validate(raw)
+        validate_pdf_url(receipt.requested_url)
+        validate_pdf_url(receipt.resolved_url)
+    except ValueError as error:
+        raise ValueError("Checkpoint-bound source receipt is invalid") from error
+    if receipt.requested_url != expected_url or receipt.sha256 != expected_sha256:
+        raise ValueError("Checkpoint-bound source receipt differs from the selected guide or source")
+    actual = _cache_read(pdf_path, MAX_BYTES, observed, check_cancel, expected_prefix=b"%PDF-")
+    if actual != expected_sha256 or observed[pdf_path][2] != receipt.size_bytes:
+        raise ValueError("Checkpoint-bound source PDF differs from its existing receipt")
+    for path, (_, _, _, limit) in tuple(observed.items()):
+        _cache_read(path, limit, observed, check_cancel)
+    _check(check_cancel)
+    return receipt.model_dump(mode="json")
+
+
+def _trusted_cached_pages(pdf_path: Path, output_dir: Path, identity: dict, proof,
+                          check_cancel: CancelCheck, on_progress, observed: dict) -> list[dict]:
+    """Reuse exact prior pixels, not a claim of authenticated historical renderer execution.
+
+    The caller supplies private checkpoint source/page bindings, never metadata inferred
+    from this cache. Cache parameters are only a compatibility check against this run.
+    Any contradiction under supplied proof fails closed without repairing cached files.
+    """
+    proof = validate_trusted_page_bindings(proof, identity["source_sha256"])
+    count, trusted = proof["page_count"], proof["pages"]
+    dimensions = [{"width_px": b["width"], "height_px": b["height"]} for b in trusted]
+    source_identity = _cache_path_identity(pdf_path)
+    root_identity = _cache_path_identity(output_dir)
+    records = _cache_json(output_dir / "pages.json", observed, check_cancel)
+    resume = _cache_json(output_dir / "resume.json", observed, check_cancel)
+    batches = _batches(dimensions)
+    if (not isinstance(records, list) or len(records) != count or not isinstance(resume, dict)
+            or set(resume) != {"identity", "page_count", "batches"}
+            or resume["identity"] != identity or type(resume["page_count"]) is not int
+            or resume["page_count"] != count or not isinstance(resume["batches"], dict)
+            or set(resume["batches"]) != {str(start) for start, _ in batches}):
+        raise ValueError("Trusted source cache metadata or parameters are incompatible")
+    saved_identity = resume["identity"]
+    if (type(saved_identity["version"]) is not int
+            or type(saved_identity["batch_pages"]) is not int or type(saved_identity["batch_pixels"]) is not int
+            or type(saved_identity["scale"]) not in (int, float)):
+        raise ValueError("Trusted source cache parameter types are invalid")
+    if any(not isinstance(resume["batches"][str(start)], list)
+           or len(resume["batches"][str(start)]) != stop - start for start, stop in batches):
+        raise ValueError("Trusted source cache has incomplete batches")
+    if [r for start, _ in batches for r in resume["batches"][str(start)]] != records:
+        raise ValueError("Trusted source cache manifests disagree")
+    total_bytes, names = 0, set()
+    for path in output_dir.glob("page-*.png"):
+        _check(check_cancel)
+        _cache_path_identity(path)
+        info = path.stat()
+        if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= PAGE_FILE_BYTES:
+            raise ValueError("Trusted source cache page exceeds file limits")
+        total_bytes += info.st_size
+        names.add(path.name)
+        if len(names) > MAX_PAGES or total_bytes > MAX_OUTPUT_BYTES:
+            raise ValueError("Trusted source cache exceeds output limits")
+    if names != {f"page-{index:03d}.png" for index in range(count)}:
+        raise ValueError("Trusted source cache page coverage is incomplete or unexpected")
+    from PIL import Image
+    for index, (record, binding) in enumerate(zip(records, trusted)):
+        filename = f"page-{index:03d}.png"
+        if (not isinstance(record, dict) or type(record.get("page_index")) is not int
+                or record["page_index"] != index or record.get("file") != filename
+                or record.get("renderer") != identity["renderer"] or record.get("scale") != identity["scale"]
+                or type(record.get("scale")) not in (int, float)
+                or record.get("coordinate_origin") != "top_left_after_page_rotation"
+                or type(record.get("width_px")) is not int or record["width_px"] != binding["width"]
+                or type(record.get("height_px")) is not int or record["height_px"] != binding["height"]
+                or type(record.get("size_bytes")) is not int or record.get("sha256") != binding["sha256"]):
+            raise ValueError("Trusted source cache record differs from checkpoint or render parameters")
+        raw = _cache_bytes(output_dir / filename, PAGE_FILE_BYTES, observed, check_cancel)
+        if len(raw) != record["size_bytes"] or hashlib.sha256(raw).hexdigest() != binding["sha256"]:
+            raise ValueError("Trusted source page bytes differ from checkpoint")
+        with Image.open(BytesIO(raw)) as image:
+            if image.format != "PNG" or image.size != (binding["width"], binding["height"]):
+                raise ValueError("Trusted source page actual format or dimensions differ from checkpoint")
+            image.verify()
+    if on_progress:
+        on_progress(count, count)
+    # Unconditional final content/path fences also run after cancellation/progress callbacks.
+    for path, (_, _, _, limit) in tuple(observed.items()):
+        _cache_read(path, limit, observed, check_cancel)
+    if (_cache_path_identity(output_dir) != root_identity
+            or _cache_path_identity(pdf_path) != source_identity):
+        raise ValueError("Trusted source PDF or cache root changed during verification")
+    _check(check_cancel)
+    return records
+
+
 def render_pages(pdf_path: Path, output_dir: Path, *, scale: float = 1.5,
                  check_cancel: CancelCheck = None, expected_sha256: str | None = None,
-                 on_progress: Callable[[int, int], None] | None = None) -> list[dict]:
-    """Resume verified batches; publish pages.json only after every page is complete."""
+                 on_progress: Callable[[int, int], None] | None = None,
+                 trusted_page_bindings: dict | None = None) -> list[dict]:
+    """Resume verified batches, or verify exact complete private-checkpoint pixels."""
     if expected_sha256 is not None and (not isinstance(expected_sha256, str) or
                                         not re.fullmatch(r"[a-f0-9]{64}", expected_sha256)):
         raise ValueError("Expected source SHA-256 must be 64 lowercase hexadecimal characters")
@@ -322,15 +580,30 @@ def render_pages(pdf_path: Path, output_dir: Path, *, scale: float = 1.5,
         raise ValueError("Render scale must be between 0.1 and 4")
     if not 0 < pdf_path.stat().st_size <= MAX_BYTES:
         raise ValueError("PDF exceeds render size limit")
+    if trusted_page_bindings is not None:
+        if expected_sha256 is None:
+            raise ValueError("Trusted source-page reuse requires the verified source receipt SHA-256")
+        _cache_path_identity(pdf_path)
+        _cache_path_identity(output_dir)
+        lock = output_dir / ".render.lock"
+        if lock.exists() or lock.is_symlink():
+            _cache_path_identity(lock)
     output_dir.mkdir(parents=True, exist_ok=True)
-    with _locked(output_dir / ".render.lock", check_cancel):
-        source_sha256 = file_sha256(pdf_path, check_cancel)
+    lock_context = _trusted_cache_lock if trusted_page_bindings is not None else _locked
+    with lock_context(output_dir / ".render.lock", check_cancel):
+        observed = {}
+        source_sha256 = (_cache_read(pdf_path, MAX_BYTES, observed, check_cancel)
+                         if trusted_page_bindings is not None else file_sha256(pdf_path, check_cancel))
         if expected_sha256 is not None and source_sha256 != expected_sha256:
-            _invalidate_render_manifests(output_dir)
+            if trusted_page_bindings is None:
+                _invalidate_render_manifests(output_dir)
             raise ValueError("Source PDF checksum does not match the expected receipt")
         identity = {"version": 2, "source_sha256": source_sha256,
                     "renderer": f"pypdfium2/{version('pypdfium2')}", "scale": scale,
                     "batch_pages": BATCH_PAGES, "batch_pixels": BATCH_PIXELS}
+        if trusted_page_bindings is not None:
+            return _trusted_cached_pages(pdf_path, output_dir, identity, trusted_page_bindings,
+                                         check_cancel, on_progress, observed)
         # Source caches are private; temporary snapshots and batch files must not
         # be created below the public page asset tree. The regular copy deliberately
         # has a separate inode so later source replacement or in-place writes are safe.

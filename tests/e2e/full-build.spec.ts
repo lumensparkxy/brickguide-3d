@@ -14,12 +14,14 @@ test('plays every real instruction slowly, freezes on pause, and reaches the exa
   const status=await (await page.request.get('/api/v1/sets/30669/guides/alt-02/status')).json();
   const scene=await (await page.request.get(`/api/v1/reconstructions/${status.latest_candidate_revision}/scene`)).json();
   await page.getByLabel('Jump to instruction').selectOption(String(scene.steps.length-1));
+  await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','idle');
   const canvas=page.locator('.viewport canvas');const final=await canvas.screenshot(modelOnly);
   const started=Date.now();await button(page,'Play full build').click();
   await expect(page.getByLabel('Jump to instruction')).toHaveValue('0');
   await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state','playing');
-  // Starting pieces now highlight in place; they must not imply a guessed attachment direction.
-  await expect(page.locator('.viewport')).toHaveAttribute('data-placement-mode','highlight');
+  // Starting pieces have a labelled visual entrance, not a guessed attachment direction.
+  await expect(page.locator('.viewport')).toHaveAttribute('data-placement-mode','preview');
+  await expect(page.locator('.viewport')).toHaveAttribute('data-approach-reason','starting_pieces');
   await button(page,'Pause build').click();await expect(button(page,'Resume build')).toBeVisible();
   // A pause can land in the stationary hold between steps; both states must freeze the same snapshot.
   await expect(page.locator('.viewport')).toHaveAttribute('data-animation-state',/^(paused|idle)$/);

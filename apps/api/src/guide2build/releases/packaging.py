@@ -401,6 +401,8 @@ def validate_scene_manifest(manifest: dict, steps: list[dict], report: bytes, so
     if manifest.get('release_kind') == 'unverified_alpha':
         coverage = AlphaCoverage.model_validate(source_index)
         validation = AlphaReleaseValidation.model_validate_json(report)
+        if validation.artifact_kind != manifest['alpha']['artifact_kind']:
+            raise ValueError('Alpha validation differs from its disclosed artifact kind')
         validation.check(scene, coverage, manifest['files']['preview.png']['sha256'])
         verify_source_pins(scene, registry)
     else:
