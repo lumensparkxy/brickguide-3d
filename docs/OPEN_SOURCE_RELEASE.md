@@ -20,7 +20,8 @@ and step fly-in, Replay, identical settled frames, full-build controls, phone la
 reduced motion. This verifies software behavior, not source or mechanical correctness.
 Fresh publication checks passed the same 1,405 backend tests (3 skipped), 54 frontend tests
 and all 20 software browser tests. The synthetic storage fixture now uses the configured
-test origin so isolated local ports can be tested. Application runtime files match the
+test origin so isolated local ports can be tested. Synthetic PNG fixtures are fixed
+as exact bytes so image compression does not change prompt-golden hashes across platforms. Application runtime files match the
 production snapshot byte for byte. GitHub Actions provides a fresh hosted check.
 
 The default web runtime does not perform fresh model reconstruction. The separate local
