@@ -1,5 +1,9 @@
 # Production hardening evidence — 25 October 2026
 
+Historical local checkpoint. Later GitHub execution supersedes the missing-container
+gate: see [GITHUB_CONTAINER_CI.md](GITHUB_CONTAINER_CI.md). Container behavior passed;
+the OS-image vulnerability gate remains blocked.
+
 Scope: dependency remediation and a locally tested furniture-only release candidate.
 No push, deployment, source publication, credential creation, or paid inference was
 performed. Existing user work is preserved. The package does not include the combined

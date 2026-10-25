@@ -401,5 +401,35 @@
     "evidence": "var/evidence/production-hardening",
     "report": "docs/furniture/PRODUCTION_HARDENING.md",
     "compatibility_browser_tests_passed": 26
+  },
+  "github_container_validation_20261025": {
+    "status": "ci_configured_runtime_passed_security_blocked",
+    "branch": "codex/furniture-container-ci",
+    "tested_commit": "796931d735b461d0291f75f64eded6279df11ff8",
+    "run_url": "https://github.com/lumensparkxy/brickguide-3d/actions/runs/40240643751",
+    "software_run_url": "https://github.com/lumensparkxy/brickguide-3d/actions/runs/40240643815",
+    "image_id": "sha256:f97822e761beb6308fad0ff8363af296b04112825efa90eb6b308f41868eca67",
+    "source_digest": "b53347a110aa4b86b66ddf44504543efcc9d10cd0ef9c378ebcb14a3c464efce",
+    "github_backend_passed": 549,
+    "github_backend_skipped": 2,
+    "frontend_tests_passed": 111,
+    "software_browser_tests_passed": 17,
+    "container_browser_tests_passed": 36,
+    "container_smoke_checks_passed": 31,
+    "container_restart_checks_passed": 31,
+    "scan_severity_counts": {
+      "LOW": 61,
+      "HIGH": 44,
+      "MEDIUM": 58,
+      "UNKNOWN": 1
+    },
+    "blocking_package_findings": 44,
+    "blocking_unique_cves": 8,
+    "image_published": false,
+    "deployment_performed": false,
+    "human_review": "not_run",
+    "physical_build": "not_run",
+    "evidence": "var/evidence/github-container-ci/run-40240643751",
+    "report": "docs/furniture/GITHUB_CONTAINER_CI.md"
   }
 }

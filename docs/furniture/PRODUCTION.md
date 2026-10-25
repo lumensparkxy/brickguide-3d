@@ -38,15 +38,18 @@ read-only root, dropped capabilities, resource limits and loopback-only exposure
 Local verification and exact candidate identity are recorded in
 [the hardening report](PRODUCTION_HARDENING.md). Browser checks exercise the built
 frontend and isolated server, not Vite. Native frozen-candidate checks exercise source
-corruption/missing-file failures and recovery. Docker/Podman are absent on this host,
-so container build/run, final image scan and container rollback remain **not run**.
+corruption/missing-file failures and recovery. Docker/Podman remain absent locally, but GitHub has now built and exercised the image.
+All 36 container browser tests and 31 smoke plus 31 restart checks passed. The image
+scan blocks release on 44 HIGH package findings across eight CVEs with no fixed versions
+reported. See [GitHub container results](GITHUB_CONTAINER_CI.md). Actual deployment
+rollback remains **not run**.
 The existing frontend chunk-size advisory and TestClient deprecation are retained.
 
 ## Remaining deployment gates
 
 | Gate | Required evidence / decision | Current state |
 |---|---|---|
-| Container | Build pinned image, scan OS/runtime packages, browser smoke and rollback | Blocked by absent container runtime |
+| Container | Resolve scanner findings; actual deployment rollback | GitHub build/browser/restart passed; scan blocks 44 HIGH package findings |
 | Source review | Human checks exact coach revision and action/source links | not_run |
 | Physical pilot | Five first-time users under PILOT_STUDY.md | not_run |
 | Devices | Actual iPhone/Safari and Android/Chrome; microphone only if voice is later enabled | not_run |

@@ -576,3 +576,10 @@ Upload only allowlisted metadata/test reports, never source manuals/crops/images
 container archives. No deployment, registry publication, provider keys or paid inference.
 Validate locally, push the task branch, inspect the real GitHub run and fix failures.
 Primary owns workflow/config/docs; container-check worker owns smoke helper and tests.
+
+GitHub checkpoint: branch codex/furniture-container-ci is pushed. Tested code796931d
+passed image build,36 container browser cases,31 smoke checks and31 restart checks.
+Run40240643751 is correctly failed by44 HIGH OS-package findings across8 CVEs; no
+fixed versions are reported. Software CI40240643815 passed. No suppression, merge,
+registry publication, secret setup or deployment. Keep the release blocked on this
+specific security gate; exact evidence is in docs/furniture/GITHUB_CONTAINER_CI.md.
