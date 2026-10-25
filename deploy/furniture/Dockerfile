@@ -1,5 +1,5 @@
 # Local candidate only. Assets must be explicitly prepared and verified first.
-FROM python:3.11-slim-bookworm@sha256:f06d01d4ba3f8ad5af45a3ec87df19c1d317d8e8961edc0fabda61811af6f7cf AS verified-source
+FROM python:3.11-slim-trixie@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377 AS verified-source
 WORKDIR /source
 COPY . .
 RUN python tools/verify_furniture_context.py /source
@@ -17,12 +17,14 @@ COPY --from=verified-source /source/config/sets.json config/sets.json
 COPY --from=verified-source /source/config/furniture config/furniture
 RUN npm run build
 
-FROM python:3.11-slim-bookworm@sha256:f06d01d4ba3f8ad5af45a3ec87df19c1d317d8e8961edc0fabda61811af6f7cf
+FROM python:3.11-slim-trixie@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377
 COPY --from=ghcr.io/astral-sh/uv:0.9.2@sha256:6dbd7c42a9088083fa79e41431a579196a189bcee3ae68ba904ac2bf77765867 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY --from=verified-source /source/pyproject.toml /source/uv.lock ./
 COPY --from=verified-source /source/apps/api/src apps/api/src
 RUN uv sync --frozen --no-dev --no-editable --no-cache
+# Runtime needs no package installer or vendored wheel/archive build tooling.
+RUN /usr/local/bin/python -m pip uninstall --yes setuptools wheel pip && rm /usr/local/bin/uv
 COPY --from=verified-source /source/config/furniture config/furniture
 # Named context is opt-in; do not broaden root .dockerignore to include manuals.
 COPY --from=furniture-assets /documents /app/var/furniture/documents

@@ -80,7 +80,7 @@ jobs:
             --tmpfs /tmp:rw,noexec,nosuid,size=16m --cap-drop ALL \
             --security-opt no-new-privileges:true --pids-limit 128 \
             --memory 512m --cpus 2 "$IMAGE"
-          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 2 --retry-max-time 60 --max-time 5 http://127.0.0.1:8088/api/v1/furniture/health > /dev/null
+          curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 --retry-max-time 60 --max-time 5 http://127.0.0.1:8088/api/v1/furniture/health > /dev/null
           .venv/bin/python tools/test_furniture_container.py \
             --container furniture-ci --expected-image "$(cat var/evidence/container-ci/image-id.txt)" --output var/evidence/container-ci/smoke.json
       - name: Browser tests against the actual container
@@ -91,7 +91,7 @@ jobs:
       - name: Verify container restart recovery
         run: |
           docker restart furniture-ci
-          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 2 --retry-max-time 60 --max-time 5 http://127.0.0.1:8088/api/v1/furniture/health > /dev/null
+          curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-connrefused --retry-delay 2 --retry-max-time 60 --max-time 5 http://127.0.0.1:8088/api/v1/furniture/health > /dev/null
           .venv/bin/python tools/test_furniture_container.py \
             --container furniture-ci --expected-image "$(cat var/evidence/container-ci/image-id.txt)" --output var/evidence/container-ci/restart.json
       - name: Enforce image vulnerability gate
