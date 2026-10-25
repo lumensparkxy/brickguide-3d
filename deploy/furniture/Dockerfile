@@ -14,6 +14,7 @@ COPY --from=verified-source /source/packages/contracts packages/contracts
 COPY --from=verified-source /source/tests/fixtures/synthetic.scene.json tests/fixtures/synthetic.scene.json
 COPY --from=verified-source /source/config/placement-30669-alt-02-v3.json config/placement-30669-alt-02-v3.json
 COPY --from=verified-source /source/config/sets.json config/sets.json
+COPY --from=verified-source /source/config/furniture config/furniture
 RUN npm run build
 
 FROM python:3.11-slim-bookworm@sha256:f06d01d4ba3f8ad5af45a3ec87df19c1d317d8e8961edc0fabda61811af6f7cf
