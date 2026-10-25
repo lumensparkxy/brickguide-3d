@@ -29,7 +29,9 @@ uv run python tools/prepare_reference.py  # first setup: official PDF + parts + 
 uv run python tools/dev.py
 ```
 
-Frontend: http://127.0.0.1:5173 · API: http://127.0.0.1:8000/api/v1/health
+Project showcase: http://127.0.0.1:5173 · LEGO: http://127.0.0.1:5173/lego · IKEA: http://127.0.0.1:5173/ikea
+
+API: http://127.0.0.1:8000/api/v1/health
 The launcher starts the API, SQLite worker and frontend on loopback; Ctrl-C stops all three.
 Enter **30669**, choose **Alternate aeroplane — booklet 02**, then prepare the official source or
 open the available candidate for review. Candidate warnings remain visible throughout navigation.

@@ -6,7 +6,7 @@ import matrix from '../fixtures/release-sets.json';
 test('ten real sets: record catalogue and tutorial gates without substituting models',async({page})=>{
   test.setTimeout(120000);
   const dir=process.env.GUIDE2BUILD_AUDIT_DIR??'var/evidence/ten-set-release';await mkdir(dir,{recursive:true});
-  await page.setViewportSize({width:1440,height:900});await page.goto('/');
+  await page.setViewportSize({width:1440,height:900});await page.goto('/lego');
   await expect(page.getByRole('combobox',{name:'Your set number'}).locator('option')).toHaveCount(10);
   const outcomes=[];
   for(const entry of matrix){

@@ -10,7 +10,7 @@ export default defineConfig({
   projects: [
     { name: 'software', testMatch: softwareSpecs },
     // Still part of the default local suite; requires the recorded official-source cache.
-    { name: 'reference', testIgnore: softwareSpecs },
+    { name: 'reference', testIgnore: [...softwareSpecs, '**/furniture-production.spec.ts'] },
   ],
   use: { baseURL: 'http://127.0.0.1:5173', trace: 'retain-on-failure' },
   webServer: [

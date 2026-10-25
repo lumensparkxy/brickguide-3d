@@ -30,7 +30,7 @@ function visible(s: Awaited<ReturnType<typeof silhouette>>) {
 test('camera buttons preserve the model, reverse, and work after drag and scroll', async({page}) => {
   test.setTimeout(180000); // Real geometry plus >80 deliberately sequential toolbar interactions.
   await mkdir(evidence,{recursive:true}); await page.setViewportSize({width:1440,height:1000});
-  await page.goto('/'); await page.getByRole('button',{name:'Find my set',exact:true}).click();
+  await page.goto('/lego'); await page.getByRole('button',{name:'Find my set',exact:true}).click();
   await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.locator('.viewport canvas')).toBeVisible();
   await page.getByText('Loading individual part geometry…').waitFor({state:'hidden',timeout:30000});

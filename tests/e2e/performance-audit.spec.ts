@@ -30,7 +30,7 @@ for(const profile of [{name:'desktop',width:1440,height:900,deviceScaleFactor:1,
     const page=await context.newPage();const errors:string[]=[];const failedRequests:string[]=[];
     page.on('pageerror',error=>errors.push(error.message));page.on('requestfailed',request=>failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`));
     const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');await cdp.send('Network.clearBrowserCache');
-    await page.goto(`${benchmarkURL}/?benchmark=1`);const cold=await openFromLanding(page);
+    await page.goto(`${benchmarkURL}/lego?benchmark=1`);const cold=await openFromLanding(page);
     const coldResources=await page.evaluate(()=>performance.getEntriesByType('resource').map(e=>{const r=e as PerformanceResourceTiming;return{name:r.name,duration:r.duration,transferSize:r.transferSize,encodedBodySize:r.encodedBodySize};}));
     // Same context and normal HTTP cache, with the server's existing PDF/reconstruction/part cache in both loads.
     await page.reload();const warm=await openFromLanding(page);

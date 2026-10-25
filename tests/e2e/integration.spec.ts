@@ -4,7 +4,7 @@ import {test,expect} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
 const evidence='var/evidence/browser';
 test('real backend lookup, malformed input, unsupported set and provider boundary',async({page})=>{
-  await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:900});await page.goto('/');await page.screenshot({path:`${evidence}/lookup-desktop.png`,fullPage:true});
+  await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:900});await page.goto('/lego');await page.screenshot({path:`${evidence}/lookup-desktop.png`,fullPage:true});
   const invalid=await page.request.get('/api/v1/sets/x');expect(invalid.status()).toBe(422);expect((await invalid.json()).detail.code).toBe('invalid_set_number');
   const unsupported=await page.request.get('/api/v1/sets/12345');expect(unsupported.status()).toBe(404);expect((await unsupported.json()).detail.code).toBe('unsupported_set');
   const field=page.getByRole('combobox',{name:'Your set number'});
@@ -17,7 +17,7 @@ test('real source candidate workspace, navigation, camera, callouts and review',
   test.setTimeout(90000); // Captures all 16 real steps, camera reversals and viewer reopen cycles.
   const status=await page.request.get('/api/v1/sets/30669/guides/alt-02/status');const info=await status.json();
   expect(info.latest_candidate_revision,'The reference project requires the recorded PDF-assisted scene and source/part cache.').toBeTruthy();
-  await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:900});await page.goto('/');
+  await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:900});await page.goto('/lego');
   const runtimeErrors:string[]=[];page.on('pageerror',e=>runtimeErrors.push(e.message));
   await page.getByRole('button',{name:'Find my set'}).click();const loadStart=Date.now();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.locator('.candidate-status')).toContainText('PDF-assisted · needs review');await expect(page.locator('.candidate-banner')).toHaveCount(0);await page.locator('.provenance summary').click();await expect(page.locator('.provenance')).toContainText('not an automatic PDF conversion');await expect(page.locator('.provenance')).toContainText('16 instructions · 32 physical pieces');await page.locator('.provenance summary').click();await expect(page.getByText('Loading individual part geometry…')).toBeHidden({timeout:30000});

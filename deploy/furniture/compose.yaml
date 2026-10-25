@@ -1,0 +1,22 @@
+# Use a locally built immutable image ID or an approved registry digest.
+services:
+  furniture:
+    image: ${FURNITURE_IMAGE:?Set FURNITURE_IMAGE to the tested immutable image ID or digest}
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

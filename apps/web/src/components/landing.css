@@ -20,3 +20,5 @@
 .hero-art figcaption small{display:block;font-size:10px;font-weight:450;letter-spacing:0;margin-top:4px}.landing-footer .artwork-note{border:0;padding-top:8px;font-size:11px}
 
 .booklet-sample-details{margin:0 24px 24px;font-size:14px;color:#456076}.booklet-sample-details summary{cursor:pointer;font-weight:650}.booklet-sample-details .notice{margin:12px 0 0}
+
+.landing-header{flex-wrap:wrap}.landing-header nav{display:flex;gap:20px}.landing-header nav a{display:inline-flex;align-items:center;min-height:44px}

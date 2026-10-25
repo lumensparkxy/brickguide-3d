@@ -1,0 +1,587 @@
+{
+  "schema_version": "1.0",
+  "product": {
+    "article_number": "80104268",
+    "display_article_number": "801.042.68",
+    "name": "LACK side table",
+    "variant": "Black-brown · 55 × 55 cm",
+    "dimensions_mm": {
+      "width": 550,
+      "depth": 550,
+      "height": 450
+    },
+    "product_url": "https://www.ikea.com/ch/en/p/lack-side-table-black-brown-80104268/",
+    "documents": [
+      {
+        "id": "AA-207276-4",
+        "title": "Assembly instructions (2006)",
+        "url": "https://www.ikea.com/ch/en/assembly_instructions/lack-side-table-black-brown__AA-207276-4-1.pdf",
+        "page_count": 1,
+        "sha256": "5f8ae60c8e7ac6707df08bcc49b2a5322839153f40c317948d70ab9e5f446025",
+        "role": "primary",
+        "notice": "© Inter IKEA Systems B.V. 2006"
+      },
+      {
+        "id": "AA-2205802-3",
+        "title": "Care and fastening checks",
+        "url": "https://www.ikea.com/ch/en/manuals/lack-side-table-black-brown__AA-2205802-3-2.pdf",
+        "page_count": 1,
+        "sha256": "83a707fcef7cf10bc1417cbb82d638372188f8f0cda7137ca009de9001cc8545",
+        "role": "care",
+        "notice": "© Inter IKEA Systems B.V. 2021"
+      }
+    ],
+    "family_id": "lack-55x55",
+    "finish": {
+      "id": "black-brown",
+      "name": "Black-brown",
+      "base_color": "#302822",
+      "wood_effect": true
+    }
+  },
+  "revision": "lack-80104268-coach-v1",
+  "source_sha256": "5f8ae60c8e7ac6707df08bcc49b2a5322839153f40c317948d70ab9e5f446025",
+  "artifact_kind": "pdf_assisted_authoring",
+  "geometry_note": "Instructional schematic in millimetres. Overall 550 × 550 × 450 mm dimensions come from the official product page. Panel thickness, leg cross-section, attachment offsets and screw geometry are illustrative; the booklet does not specify their measurements. No connector, load, thread engagement or physical assembly validation is claimed.",
+  "source_sequence_note": "The selected product links the unnumbered AA-207276-4 assembly diagram: four screws 115980, screw then leg, and protected working surface. Eleven assistant-authored actions expand the repeated connection. Corner numbering is assistant-authored. Product-page information supplies load limits and, where linked, care instructions.",
+  "review": {
+    "agent_review": "source_checked",
+    "human_review": "not_run",
+    "physical_build": "not_run"
+  },
+  "components": [
+    {
+      "id": "tabletop",
+      "name": "Tabletop",
+      "quantity": 1,
+      "hardware_id": null,
+      "description": "Square black-brown tabletop. The overall table is 550 × 550 mm; use its existing attachment points."
+    },
+    {
+      "id": "legs",
+      "name": "Legs",
+      "quantity": 4,
+      "hardware_id": null,
+      "description": "Four legs, attached by turning each onto an exposed double-ended screw. Schematic proportions are illustrative."
+    },
+    {
+      "id": "screws",
+      "name": "Double-ended screws",
+      "quantity": 4,
+      "hardware_id": "115980",
+      "description": "The official hardware callout identifies four screws numbered 115980. The diagram shows threads at both ends."
+    }
+  ],
+  "warnings": [
+    "Maximum load: 10 kg."
+  ],
+  "steps": [
+    {
+      "id": "prepare",
+      "title": "Prepare a protected surface",
+      "instruction": "Read the safety information before starting. The assembly diagram shows a soft covering under the tabletop to protect its finish. Place the tabletop with its attachment points accessible, as shown in the assembly diagram.",
+      "kind": "prepare",
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "active_components": [
+        "tabletop"
+      ],
+      "help": [
+        {
+          "question": "Why protect the tabletop?",
+          "answer": "The assembly diagram contrasts a protected surface with damage on an unprotected surface. Use the original diagram to check how the tabletop is supported."
+        }
+      ],
+      "warnings": [
+        "Maximum load: 10 kg."
+      ],
+      "secondary_source": {
+        "document_id": null,
+        "page_index": null,
+        "product_url": "https://www.ikea.com/ch/en/p/lack-side-table-black-brown-80104268/"
+      }
+    },
+    {
+      "id": "hardware",
+      "title": "Identify the four screws",
+      "instruction": "Find the four double-ended screws marked 115980 in the official diagram. Match the hardware before proceeding. Keep the tabletop and four legs ready.",
+      "kind": "prepare",
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "active_components": [
+        "screws",
+        "legs"
+      ],
+      "help": [
+        {
+          "question": "Which screw is this?",
+          "answer": "Look for the double-ended threaded fastener illustrated beside “4×” and “115980” on the official page."
+        },
+        {
+          "question": "What if the hardware does not match?",
+          "answer": "Stop and compare your product and hardware with the official document. This tutorial supports only the selected LACK variant; do not substitute an unverified screw."
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "insert-screws",
+      "title": "Insert the screws into the tabletop",
+      "instruction": "The first close-up shows a double-ended screw being turned by hand into a tabletop attachment point, leaving the other end available for the leg. Follow that diagram for each attachment. The sheet supplies four screws.",
+      "kind": "insert_screws",
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "active_components": [
+        "tabletop",
+        "screws"
+      ],
+      "help": [
+        {
+          "question": "How far should I turn the screw?",
+          "answer": "The booklet does not specify a turn count, torque or insertion depth. Follow the original close-up; this schematic does not supply those missing measurements."
+        },
+        {
+          "question": "Why is part of the screw exposed?",
+          "answer": "The next close-up shows the leg attached to the exposed end. The diagram, not the schematic thread shape, is the source for that connection."
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "attach-legs",
+      "title": "Turn each leg onto its screw",
+      "instruction": "The second close-up shows the leg turning onto the exposed screw. Repeat the illustrated connection for the four legs. Keep the tabletop supported on the protective surface shown in the guide.",
+      "kind": "attach_legs",
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "active_components": [
+        "legs",
+        "screws"
+      ],
+      "help": [
+        {
+          "question": "Should the leg be pushed straight down?",
+          "answer": "The curved arrows show a turning action. The 3D view highlights the connection; it does not prescribe a turn count or torque."
+        },
+        {
+          "question": "What if a leg will not attach?",
+          "answer": "Stop instead of forcing it. Recheck the selected product, fastener identity and orientation against the official close-ups. The assistant cannot diagnose damaged hardware or verify a connection physically."
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "finish",
+      "title": "Check the fastenings and care for your table",
+      "instruction": "Check that the assembly fastenings are properly tightened. The official care sheet says to check them regularly and retighten when necessary. Wipe with a damp cloth, then dry with a clean cloth. Keep the safety limits in mind when using the table.",
+      "kind": "finish",
+      "source": {
+        "document_id": "AA-2205802-3",
+        "page_index": 0,
+        "product_url": null
+      },
+      "active_components": [
+        "tabletop",
+        "legs"
+      ],
+      "help": [
+        {
+          "question": "How do I clean the table?",
+          "answer": "The care sheet specifies a damp cloth followed by a clean dry cloth."
+        },
+        {
+          "question": "Does completing this tutorial certify my assembly?",
+          "answer": "No. Completion records your progress only. An agent-reviewed diagram and an instructional schematic cannot verify the actual fastenings or physical assembly."
+        }
+      ],
+      "warnings": [
+        "Maximum load: 10 kg."
+      ],
+      "secondary_source": {
+        "document_id": null,
+        "page_index": null,
+        "product_url": "https://www.ikea.com/ch/en/p/lack-side-table-black-brown-80104268/"
+      }
+    }
+  ],
+  "coach_actions": [
+    {
+      "id": "prepare",
+      "kind": "prepare",
+      "title": "Prepare a protected surface",
+      "instruction": "Place the tabletop on a soft covering with its attachment points facing up, as shown in the official diagram.",
+      "component_instances": [
+        "tabletop"
+      ],
+      "animation": null,
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": "https://www.ikea.com/ch/en/p/lack-side-table-black-brown-80104268/"
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "Why protect the tabletop?",
+          "answer": "The assembly diagram contrasts a protected surface with damage on an unprotected surface. Use the original diagram to check how the tabletop is supported."
+        }
+      ],
+      "warnings": [
+        "Maximum load: 10 kg."
+      ],
+      "checks": [
+        "Use a protected surface.",
+        "Check the selected article and safety limits before starting."
+      ]
+    },
+    {
+      "id": "identify",
+      "kind": "identify",
+      "title": "Find your tabletop, four legs and four screws",
+      "instruction": "Match the four double-ended screws to hardware 115980 in the official diagram. Leg and screw instance numbers are assistant labels, not IKEA part numbers.",
+      "component_instances": [
+        "tabletop",
+        "screw-1",
+        "screw-2",
+        "screw-3",
+        "screw-4",
+        "leg-1",
+        "leg-2",
+        "leg-3",
+        "leg-4"
+      ],
+      "animation": null,
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "Which screw is this?",
+          "answer": "Look for the double-ended threaded fastener illustrated beside “4×” and “115980” on the official page."
+        },
+        {
+          "question": "What if the hardware does not match?",
+          "answer": "Stop and compare your product and hardware with the official document. This tutorial supports only the selected LACK variant; do not substitute an unverified screw."
+        }
+      ],
+      "warnings": [],
+      "checks": [
+        "One tabletop, four legs and four screws (115980)."
+      ]
+    },
+    {
+      "id": "screw-1",
+      "kind": "screw",
+      "title": "Turn Screw 1 into the tabletop",
+      "instruction": "Turn Screw 1 (115980) by hand into the attachment point at Corner 1, leaving its other end exposed for the leg. Follow the official close-up; the animation does not prescribe depth or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-1"
+      ],
+      "animation": {
+        "start": 0.0,
+        "end": 0.11
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "How far should I turn the screw?",
+          "answer": "The booklet does not specify a turn count, torque or insertion depth. Follow the original close-up; this schematic does not supply those missing measurements."
+        },
+        {
+          "question": "Why is part of the screw exposed?",
+          "answer": "The next close-up shows the leg attached to the exposed end. The diagram, not the schematic thread shape, is the source for that connection."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "leg-1",
+      "kind": "leg",
+      "title": "Turn Leg 1 onto its screw",
+      "instruction": "Turn Leg 1 onto the exposed Screw 1. Keep the tabletop supported on the protective covering. The illustrated motion does not prescribe torque or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-1",
+        "leg-1"
+      ],
+      "animation": {
+        "start": 0.11,
+        "end": 0.25
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "Should the leg be pushed straight down?",
+          "answer": "The curved arrows show a turning action. The 3D view highlights the connection; it does not prescribe a turn count or torque."
+        },
+        {
+          "question": "What if a leg will not attach?",
+          "answer": "Stop instead of forcing it. Recheck the selected product, fastener identity and orientation against the official close-ups. The assistant cannot diagnose damaged hardware or verify a connection physically."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "screw-2",
+      "kind": "screw",
+      "title": "Turn Screw 2 into the tabletop",
+      "instruction": "Turn Screw 2 (115980) by hand into the attachment point at Corner 2, leaving its other end exposed for the leg. Follow the official close-up; the animation does not prescribe depth or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-2"
+      ],
+      "animation": {
+        "start": 0.25,
+        "end": 0.36
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "How far should I turn the screw?",
+          "answer": "The booklet does not specify a turn count, torque or insertion depth. Follow the original close-up; this schematic does not supply those missing measurements."
+        },
+        {
+          "question": "Why is part of the screw exposed?",
+          "answer": "The next close-up shows the leg attached to the exposed end. The diagram, not the schematic thread shape, is the source for that connection."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "leg-2",
+      "kind": "leg",
+      "title": "Turn Leg 2 onto its screw",
+      "instruction": "Turn Leg 2 onto the exposed Screw 2. Keep the tabletop supported on the protective covering. The illustrated motion does not prescribe torque or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-2",
+        "leg-2"
+      ],
+      "animation": {
+        "start": 0.36,
+        "end": 0.5
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "Should the leg be pushed straight down?",
+          "answer": "The curved arrows show a turning action. The 3D view highlights the connection; it does not prescribe a turn count or torque."
+        },
+        {
+          "question": "What if a leg will not attach?",
+          "answer": "Stop instead of forcing it. Recheck the selected product, fastener identity and orientation against the official close-ups. The assistant cannot diagnose damaged hardware or verify a connection physically."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "screw-3",
+      "kind": "screw",
+      "title": "Turn Screw 3 into the tabletop",
+      "instruction": "Turn Screw 3 (115980) by hand into the attachment point at Corner 3, leaving its other end exposed for the leg. Follow the official close-up; the animation does not prescribe depth or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-3"
+      ],
+      "animation": {
+        "start": 0.5,
+        "end": 0.61
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "How far should I turn the screw?",
+          "answer": "The booklet does not specify a turn count, torque or insertion depth. Follow the original close-up; this schematic does not supply those missing measurements."
+        },
+        {
+          "question": "Why is part of the screw exposed?",
+          "answer": "The next close-up shows the leg attached to the exposed end. The diagram, not the schematic thread shape, is the source for that connection."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "leg-3",
+      "kind": "leg",
+      "title": "Turn Leg 3 onto its screw",
+      "instruction": "Turn Leg 3 onto the exposed Screw 3. Keep the tabletop supported on the protective covering. The illustrated motion does not prescribe torque or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-3",
+        "leg-3"
+      ],
+      "animation": {
+        "start": 0.61,
+        "end": 0.75
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "Should the leg be pushed straight down?",
+          "answer": "The curved arrows show a turning action. The 3D view highlights the connection; it does not prescribe a turn count or torque."
+        },
+        {
+          "question": "What if a leg will not attach?",
+          "answer": "Stop instead of forcing it. Recheck the selected product, fastener identity and orientation against the official close-ups. The assistant cannot diagnose damaged hardware or verify a connection physically."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "screw-4",
+      "kind": "screw",
+      "title": "Turn Screw 4 into the tabletop",
+      "instruction": "Turn Screw 4 (115980) by hand into the attachment point at Corner 4, leaving its other end exposed for the leg. Follow the official close-up; the animation does not prescribe depth or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-4"
+      ],
+      "animation": {
+        "start": 0.75,
+        "end": 0.86
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "How far should I turn the screw?",
+          "answer": "The booklet does not specify a turn count, torque or insertion depth. Follow the original close-up; this schematic does not supply those missing measurements."
+        },
+        {
+          "question": "Why is part of the screw exposed?",
+          "answer": "The next close-up shows the leg attached to the exposed end. The diagram, not the schematic thread shape, is the source for that connection."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "leg-4",
+      "kind": "leg",
+      "title": "Turn Leg 4 onto its screw",
+      "instruction": "Turn Leg 4 onto the exposed Screw 4. Keep the tabletop supported on the protective covering. The illustrated motion does not prescribe torque or a turn count.",
+      "component_instances": [
+        "tabletop",
+        "screw-4",
+        "leg-4"
+      ],
+      "animation": {
+        "start": 0.86,
+        "end": 1.0
+      },
+      "source": {
+        "document_id": "AA-207276-4",
+        "page_index": 0,
+        "product_url": null
+      },
+      "confirmation_label": "Done, next",
+      "help": [
+        {
+          "question": "Should the leg be pushed straight down?",
+          "answer": "The curved arrows show a turning action. The 3D view highlights the connection; it does not prescribe a turn count or torque."
+        },
+        {
+          "question": "What if a leg will not attach?",
+          "answer": "Stop instead of forcing it. Recheck the selected product, fastener identity and orientation against the official close-ups. The assistant cannot diagnose damaged hardware or verify a connection physically."
+        }
+      ],
+      "warnings": [],
+      "checks": []
+    },
+    {
+      "id": "final-checks",
+      "kind": "finish",
+      "title": "Check your finished table",
+      "instruction": "Check that the assembly fastenings are properly tightened. The official care sheet says to check them regularly and retighten when necessary. Wipe with a damp cloth, then dry with a clean cloth. Keep the safety limits in mind when using the table.",
+      "component_instances": [
+        "tabletop",
+        "leg-1",
+        "leg-2",
+        "leg-3",
+        "leg-4"
+      ],
+      "animation": null,
+      "source": {
+        "document_id": "AA-2205802-3",
+        "page_index": 0,
+        "product_url": "https://www.ikea.com/ch/en/p/lack-side-table-black-brown-80104268/"
+      },
+      "confirmation_label": "Finish assembly",
+      "help": [
+        {
+          "question": "How do I clean the table?",
+          "answer": "The care sheet specifies a damp cloth followed by a clean dry cloth."
+        },
+        {
+          "question": "Does completing this tutorial certify my assembly?",
+          "answer": "No. Completion records your progress only. An agent-reviewed diagram and an instructional schematic cannot verify the actual fastenings or physical assembly."
+        }
+      ],
+      "warnings": [
+        "Maximum load: 10 kg."
+      ],
+      "checks": [
+        "Check that all assembly fastenings are properly tightened.",
+        "Check fastenings regularly and retighten when necessary.",
+        "Wipe with a damp cloth, then dry with a clean cloth.",
+        "Maximum load: 10 kg."
+      ]
+    }
+  ]
+}

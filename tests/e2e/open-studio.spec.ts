@@ -3,7 +3,7 @@ import {mkdir} from 'node:fs/promises';
 test('studio groups main steps without skipping callouts and keeps phone context visible',async({page})=>{
   test.setTimeout(60000);
   await mkdir('var/evidence/open-studio',{recursive:true});
-  await page.setViewportSize({width:1440,height:900});await page.goto('/');
+  await page.setViewportSize({width:1440,height:900});await page.goto('/lego');
   await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('button',{name:'Play full build',exact:true})).toBeEnabled({timeout:30000});
   await expect(page.locator('.step-timeline button')).toHaveCount(12);

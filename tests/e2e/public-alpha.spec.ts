@@ -45,7 +45,7 @@ async function transport(page:Page) {
     await route.fulfill({body:chunks[index].body,contentType:'application/json'});
   });
   await page.route('**/published-assets/alpha-transport/ldraw/**',route=>route.fulfill({status:404,body:'Geometry deliberately absent in the synthetic transport fixture.'}));
-  await page.goto('/');await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set',exact:true}).click();
+  await page.goto('/lego');await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set',exact:true}).click();
   await expect(page.getByRole('heading',{name:'99999 · Synthetic alpha transport fixture',exact:true})).toBeVisible();
   return control;
 }

@@ -18,11 +18,13 @@ from .jobs.store import Conflict, Store
 from .jobs.source_cache import cached_receipt
 from .review.models import CorrectionRequest, ReviewRequest
 from .review.service import ReviewService
+from .furniture.api import create_router as create_furniture_router
 
 
 def create_app(data_dir: Path | None = None) -> FastAPI:
     data_dir = (data_dir or Path(os.getenv("GUIDE2BUILD_DATA_DIR", str(ROOT / "var")))).resolve()
     app = FastAPI(title="Guide2Build 3D", version="0.2.0")
+    app.include_router(create_furniture_router(data_dir))
     store = Store(data_dir)
     reviews = ReviewService(store)
     app.state.store = store

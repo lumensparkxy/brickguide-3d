@@ -9,7 +9,7 @@ description = "Official-guide reconstruction and Three.js tutorial backend"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "pydantic>=2.10,<3",
-  "httpx>=0.27,<1", "pypdfium2>=4.30,<6", "Pillow>=11,<13", "jsonschema>=4.23,<5"
+  "httpx>=0.27,<1", "pypdfium2>=4.30,<6", "Pillow>=13,<14", "jsonschema>=4.23,<5"
 ]
 
 [project.optional-dependencies]
@@ -18,6 +18,10 @@ cloud = ["google-cloud-firestore>=2.20,<3", "google-cloud-storage>=3,<4", "googl
 
 [tool.hatch.build.targets.wheel]
 packages = ["apps/api/src/guide2build"]
+
+[tool.uv]
+# Security floors also apply to transitive dependencies in the optional cloud graph.
+constraint-dependencies = ["certifi>=2026.10.19", "opentelemetry-api>=1.45.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/backend"]

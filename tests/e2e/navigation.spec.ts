@@ -4,7 +4,7 @@ const evidence='var/evidence/navigation-position';
 test('instruction 11 to 12 keeps navigation controls in place',async({page})=>{
   test.setTimeout(60000);
   await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:1100});
-  await page.goto('/');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/lego');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.locator('.viewport canvas')).toBeVisible();await expect(page.getByText('Loading individual part geometry…')).toBeHidden({timeout:30000});
   await page.getByLabel('Jump to instruction').selectOption('10');
   await page.getByRole('button',{name:'Next',exact:true}).scrollIntoViewIfNeeded();

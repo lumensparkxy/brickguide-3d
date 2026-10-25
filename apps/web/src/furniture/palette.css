@@ -1,0 +1,9 @@
+/* Furniture-only design tokens; deliberately independent of LEGO styling. */
+.furniture-app,.coach-app,.coach-scene{
+ --furniture-ink:#202936;--furniture-muted:#536174;--furniture-surface:#ffffff;
+ --furniture-page:#f6f7f9;--furniture-stage:#eef1f5;--furniture-line:#cbd2dc;
+ --furniture-accent:#245bc7;--furniture-accent-hover:#17449b;--furniture-accent-soft:#e9f0ff;
+ --furniture-disabled:#e8ecf1;--furniture-warning:#fff4db;--furniture-warning-ink:#684800;
+ --furniture-success:#eaf5ee;--furniture-success-ink:#24563a;
+}
+.finish-swatch{display:inline-block;width:20px;height:20px;flex:0 0 20px;vertical-align:middle;border:1px solid #657285;border-radius:50%;box-shadow:inset 0 0 0 2px #ffffff80}

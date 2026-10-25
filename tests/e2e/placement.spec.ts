@@ -17,7 +17,7 @@ async function redPosition(page:Page,name:string){
 test('instruction 9 red plates approach from underneath, and all steps have an explicit motion outcome',async({page})=>{
   test.setTimeout(60000);await mkdir(evidence,{recursive:true});await page.setViewportSize({width:1440,height:1100});
   await page.clock.install({time:new Date('2026-10-03T10:00:00Z')});
-  await page.goto('/');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/lego');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('button',{name:'Play full build',exact:true})).toBeEnabled({timeout:30000});
   await page.getByLabel('Jump to instruction').selectOption('8');
   // Freeze real rendered motion at a known frame; screenshot latency must not consume the 700ms replay.

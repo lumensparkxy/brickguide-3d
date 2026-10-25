@@ -4,7 +4,7 @@ import {test,expect,type Page} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
 const evidence='var/evidence/full-build';
 async function open(page:Page){
-  await page.goto('/');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/lego');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('button',{name:'Play full build',exact:true})).toBeEnabled({timeout:30000});
 }
 const button=(page:Page,name:string)=>page.getByRole('button',{name,exact:true});

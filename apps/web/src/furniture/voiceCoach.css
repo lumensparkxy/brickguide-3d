@@ -1,0 +1,71 @@
+.voice-companion{position:fixed;right:24px;bottom:190px;z-index:20;display:flex;flex-direction:column;align-items:flex-end;gap:8px;width:max-content;max-width:calc(100vw - 24px);pointer-events:none;color:var(--furniture-ink)}
+.voice-companion>*{pointer-events:auto}
+.voice-bubble{display:flex;align-items:center;background:var(--furniture-surface);border:1px solid var(--furniture-line);border-radius:30px;box-shadow:0 4px 18px #20293622;padding:4px;max-width:300px;gap:2px}
+.coach-app .voice-launcher{display:flex;align-items:center;gap:4px;min-height:48px;border:0;border-radius:24px;background:transparent;padding:0 8px 0 0;text-align:left}
+.voice-face{width:48px;height:48px;flex-shrink:0;color:var(--furniture-accent)}.voice-eye{fill:var(--furniture-surface)}
+.voice-bubble-label{line-height:1.2;white-space:nowrap}.voice-bubble-label strong{font-size:12px;display:block;font-weight:650}.voice-bubble-label small{display:block;font-size:9px;margin-top:3px;color:var(--furniture-muted)}
+.voice-bubble.is-live{border-color:var(--furniture-muted);background:var(--furniture-page)}.voice-bubble.is-live .voice-face{animation:voice-breathe 3s ease-in-out infinite}
+.voice-quick-controls{display:flex;gap:2px;padding-right:4px}.coach-app .voice-quick-controls button{min-width:44px;min-height:44px;padding:6px;font-size:11px;border-radius:22px}.coach-app .voice-end{border-color:#bb8174;color:#8d352a;background:#fff8f3}.coach-app .voice-mute[aria-pressed=true]{background:var(--furniture-stage)}
+.voice-popover{width:300px;max-width:calc(100vw - 24px);max-height:min(510px,calc(100dvh - 270px));overflow:auto;overscroll-behavior:contain;padding:16px;border:1px solid var(--furniture-line);border-radius:16px;background:var(--furniture-surface);box-shadow:0 8px 28px #20293622;scrollbar-gutter:stable}
+.voice-popover header{display:flex;align-items:center;justify-content:space-between;gap:8px}.voice-popover h2{margin:4px 0;font-size:17px;line-height:1.25}.voice-eyebrow{font-size:9px;letter-spacing:.1em;font-weight:700}.coach-app .voice-hide{min-width:44px;padding:4px;font-size:20px;border:0;background:transparent}.voice-action{font-size:12px;border-bottom:1px solid var(--furniture-disabled);padding-bottom:10px;line-height:1.45}.voice-status{font-size:12px;line-height:1.5}.voice-disclosure,.voice-limits{font-size:11px;line-height:1.55;color:var(--furniture-muted)}.coach-app .voice-start{width:100%;background:var(--furniture-accent);color:white;font-size:13px}.voice-transcript-details{margin-top:14px}.voice-transcript-details summary{font-size:12px;min-height:44px;padding:12px 0;cursor:pointer}.voice-transcript{max-height:160px;overflow:auto;background:var(--furniture-stage);padding:10px;border-radius:8px;font-size:12px;line-height:1.6}.voice-transcript p{margin:4px 0 12px}.voice-transcript strong{display:block;font-size:10px;text-transform:uppercase}.voice-transcript:focus-visible{outline:3px solid var(--furniture-accent)}.voice-mini-status{max-width:260px;padding:8px 12px;margin:0;border:1px solid var(--furniture-disabled);border-radius:10px;background:var(--furniture-surface);font-size:11px;line-height:1.4;box-shadow:0 4px 16px #20293612}
+@keyframes voice-breathe{50%{transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.voice-bubble.is-live .voice-face{animation:none}}
+@media(max-width:760px){.voice-companion{right:14px;bottom:176px}.voice-popover{max-height:min(480px,calc(100dvh - 250px))}.coach-app .voice-quick-controls button{padding:5px}.voice-bubble-label small{font-size:9px}}
+@media(max-height:450px){.voice-companion{bottom:142px}.voice-popover{max-height:calc(100dvh - 220px);padding:10px}.voice-mini-status{max-height:48px;overflow:auto}}
+.voice-companion[data-phase=idle] .voice-bubble-label{display:none}
+.coach-app .voice-companion[data-phase=idle] .voice-launcher{padding:0}
+.voice-popover h2:focus-visible{outline:2px solid var(--furniture-accent);outline-offset:3px}
+@media(max-height:620px){.voice-bubble-label{display:block}.voice-bubble-label small{display:none}.voice-bubble-label strong{font-size:10px}.voice-face{width:40px;height:40px}.coach-app .voice-launcher{padding:0;min-height:44px}.voice-bubble{border-radius:26px}.voice-companion{right:12px}}
+.coach-app .voice-handsfree-start{width:100%;margin-top:8px;background:var(--furniture-stage);border-color:var(--furniture-muted);font-size:12px}.voice-handsfree-controls{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.coach-app .voice-handsfree-controls button{font-size:11px;padding:7px 10px}.voice-handsfree-controls p{font-size:10px;line-height:1.5;margin:3px 0;color:var(--furniture-muted)}.voice-companion[data-hands-free-mode=active] .voice-bubble{border-color:var(--furniture-muted)}.voice-companion[data-hands-free-mode=paused] .voice-bubble{border-color:var(--furniture-muted)}
+
+.voice-bubble.is-live{border-color:var(--furniture-accent);background:var(--furniture-accent-soft)}
+.voice-companion[data-hands-free-mode=active] .voice-bubble{border-color:var(--furniture-accent)}
+.voice-companion[data-hands-free-mode=paused] .voice-bubble{border-color:#996900}
+.coach-app .voice-handsfree-start{background:var(--furniture-accent-soft);border-color:var(--furniture-accent)}
+.coach-app .voice-start:hover:not(:disabled){background:var(--furniture-accent-hover);color:white}
+
+/* A compact floating companion; dragging never starts a conversation. */
+.voice-bubble{border:1px solid #c4b5fd;background:#ffffff;box-shadow:0 10px 30px #6443cf33,0 2px 7px #17255420;padding:3px;border-radius:40px}
+.voice-face{width:64px;height:64px;filter:drop-shadow(0 3px 4px #5531b72b)}
+.coach-app .voice-launcher{cursor:grab;touch-action:none;user-select:none;border-radius:36px;min-height:64px}
+.coach-app .voice-launcher:hover:not(:disabled){background:#f1edff;border-color:transparent}
+.voice-companion[data-phase=idle] .voice-face{animation:voice-hover 4s ease-in-out infinite}
+.voice-companion.is-dragging .voice-launcher{cursor:grabbing}
+.voice-companion.is-dragging .voice-face,.voice-launcher:focus-visible .voice-face{animation:none}
+.voice-bubble.is-live{background:#f3efff;border-color:#8b5cf6;box-shadow:0 8px 28px #7c3aed33}
+.voice-move-hint{font-size:11px;line-height:1.5;color:var(--furniture-muted)}
+.coach-app .voice-reset-position{display:block;min-height:44px;background:transparent;border:0;padding:6px 0;color:var(--furniture-accent);text-decoration:underline;font-size:12px}
+@keyframes voice-hover{50%{transform:translateY(-3px) rotate(3deg)}}
+@media(max-width:760px){.voice-face{width:56px;height:56px}.coach-app .voice-launcher{min-height:56px}}
+@media(max-height:450px){.voice-face{width:44px;height:44px}.coach-app .voice-launcher{min-height:44px}}
+@media(prefers-reduced-motion:reduce){.voice-companion .voice-face{animation:none!important}}
+@media(max-height:620px){.voice-face{width:40px;height:40px}.coach-app .voice-launcher{min-height:44px}}
+
+/* Selected Nandi Pocket character: animation surrounds the real approved artwork. */
+.voice-bubble{border-color:#ffbb76;box-shadow:0 8px 26px #f9731633,0 2px 6px #7c2d121a}
+.nandi-pocket{object-fit:contain;filter:drop-shadow(0 2px 3px #9a34122a);transform-origin:50% 85%;pointer-events:none}
+.coach-app .voice-launcher:hover:not(:disabled){background:#fff3e6}
+.voice-bubble.is-live{background:#fff7ed;border-color:#fb923c;box-shadow:0 8px 26px #f9731633}
+.voice-companion[data-voice-state=listening] .nandi-pocket{animation:nandi-listen 3s ease-in-out infinite}
+.voice-companion[data-voice-state=speaking] .nandi-pocket{animation:nandi-talk .85s ease-in-out infinite}
+.voice-companion[data-voice-state=speaking] .voice-bubble{animation:nandi-glow 1.2s ease-in-out infinite}
+.voice-companion[data-voice-state=muted] .nandi-pocket,.voice-companion.is-dragging .nandi-pocket{animation:none}
+@keyframes nandi-listen{50%{transform:rotate(-5deg) translateY(-1px)}}
+@keyframes nandi-talk{50%{transform:translateY(-2px) rotate(3deg)}}
+@keyframes nandi-glow{50%{box-shadow:0 8px 28px #f9731666,0 0 0 3px #fed7aa80}}
+@media(prefers-reduced-motion:reduce){.voice-companion .voice-bubble,.voice-companion .nandi-pocket{animation:none!important}}
+
+/* Nandi floats directly on the workspace, without a button shell. */
+.coach-app .voice-companion .voice-bubble{background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;animation:none;gap:6px}
+.coach-app .voice-companion .voice-launcher,.coach-app .voice-companion .voice-launcher:hover:not(:disabled){background:transparent;border:0;border-radius:8px;padding:0}
+.coach-app .voice-companion .voice-launcher{min-height:96px}
+.voice-companion .nandi-pocket{width:96px;height:96px;filter:drop-shadow(0 4px 5px #7c2d122b)}
+.voice-companion .voice-bubble-label{background:#ffffffed;border-radius:8px;padding:7px;white-space:normal;max-width:105px}
+@keyframes nandi-talk{50%{transform:translateY(-2px) rotate(3deg);filter:drop-shadow(0 3px 7px #f9731680)}}
+@media(max-width:760px){.voice-companion .nandi-pocket{width:80px;height:80px}.coach-app .voice-companion .voice-launcher{min-height:80px}}
+@media(max-height:620px){.voice-companion .nandi-pocket{width:56px;height:56px}.coach-app .voice-companion .voice-launcher{min-height:56px}.voice-companion[data-phase=connected] .nandi-pocket,.voice-companion[data-phase=connecting] .nandi-pocket{width:40px;height:40px}.coach-app .voice-companion:not([data-phase=idle]) .voice-launcher{min-height:44px}}
+@media(max-width:600px) and (min-height:451px) and (max-height:620px){.voice-companion{bottom:162px}.voice-companion[data-phase=idle] .nandi-pocket{width:48px;height:48px}.coach-app .voice-companion[data-phase=idle] .voice-launcher{min-height:48px}.voice-companion .voice-bubble-label{padding:4px}}
+
+.nandi-pet{display:block;background-repeat:no-repeat;flex-shrink:0}
+/* Facial frames supply motion; keep the registered sprite still while animating. */
+.voice-companion .nandi-pet{animation:none!important}

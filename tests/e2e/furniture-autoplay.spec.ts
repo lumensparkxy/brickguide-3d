@@ -1,0 +1,36 @@
+import {test,expect} from '@playwright/test';
+const url='/ikea?experience=legacy&product=30449908&step=identify-screws';
+test('forward navigation autoplays once; pause/replay and final view stay stable',async({page})=>{
+ await page.goto('/ikea?experience=legacy&product=30449908&step=attach-legs');
+ await expect(page.getByTestId('full-table-viewport')).toHaveAttribute('data-playing','false');
+ await page.getByRole('button',{name:/^Step 2:/}).click();
+ const nav=await page.locator('.furn-nav').boundingBox();
+ await page.getByRole('button',{name:/^Next step/}).click();
+ const screw=page.getByTestId('connection-viewport');
+ await expect(screw).toHaveAttribute('data-playing','true');
+ await page.getByRole('button',{name:'Pause animation',exact:true}).click();
+ await expect(screw).toHaveAttribute('data-playing','false');
+ await page.getByRole('slider',{name:'Assembly animation progress'}).focus();await page.keyboard.press('End');
+ await expect(screw).toHaveAttribute('data-animation-progress','0.44000');
+ await expect(screw).toHaveAttribute('data-leg-rotation','0');
+ await page.getByRole('button',{name:'Full assembly',exact:true}).click();
+ await page.getByRole('button',{name:/^Next step/}).focus();await page.keyboard.press('ArrowRight');
+ const full=page.getByTestId('full-table-viewport');await expect(full).toHaveAttribute('data-playing','true');
+ await page.getByRole('button',{name:'Pause full assembly',exact:true}).click();
+ const paused=await full.getAttribute('data-animation-progress');await page.waitForTimeout(200);expect(await full.getAttribute('data-animation-progress')).toBe(paused);
+ await page.getByRole('button',{name:'Whole table',exact:true}).click();await page.getByRole('button',{name:'Full assembly',exact:true}).click();await expect(full).toHaveAttribute('data-playing','false');
+ await page.getByRole('button',{name:'Replay full assembly',exact:true}).click();await expect(full).toHaveAttribute('data-playing','true');
+ await page.getByRole('button',{name:/^Next step/}).click();await expect(full).toHaveAttribute('data-orientation','upright');await expect(full).toHaveAttribute('data-playing','false');
+ await page.getByRole('button',{name:/Previous/}).click();await expect(full).toHaveAttribute('data-playing','false');
+ expect(await page.locator('.furn-nav').boundingBox()).toEqual(nav);
+ await page.getByRole('button',{name:/^Step 2:/}).click();await page.getByRole('button',{name:/^Next step/}).click();await expect(screw).toHaveAttribute('data-playing','true');
+});
+test('reduced motion and hidden mobile panels suppress autoplay without delayed surprises',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:'reduce'});
+ await page.goto(url);await page.getByRole('button',{name:/^Step 2:/}).click();await page.getByRole('button',{name:/^Next step/}).click();await expect(page.getByTestId('connection-viewport')).toHaveAttribute('data-playing','false');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.getByRole('tab',{name:'Official diagram'}).click();await page.getByRole('button',{name:/^Next step/}).click();
+ const full=page.getByTestId('full-table-viewport');await expect(full).toHaveAttribute('data-playing','false');
+ await page.getByRole('tab',{name:'3D illustration'}).click();await expect(full).toHaveAttribute('data-playing','false');
+ await page.getByRole('button',{name:'Play full assembly',exact:true}).click();await expect(full).toHaveAttribute('data-playing','true');
+});

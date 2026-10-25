@@ -6,7 +6,7 @@ async function synthetic(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/sets/99999',r=>r.fulfill({json:{set_number:'99999',name:'Original synthetic test fixture',official_page:'https://www.lego.com/',guides:[{guide_id:'synthetic',label:'Synthetic test guide',expected_main_steps:3,tutorial_available:true,pdf_url:'https://www.lego.com/example.pdf'}]}}));
   await page.route('**/api/v1/sets/99999/guides/synthetic/scene',r=>r.fulfill({json:fixture}));
   await page.route('**/api/v1/sources/**',r=>r.fulfill({status:404,json:{detail:{message:'Test source intentionally absent'}}}));
-  await page.goto('/'); await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/lego'); await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.locator('.candidate-status')).toBeVisible();
   await page.locator('.provenance summary').click();
   await expect(page.getByText('Coverage: 3 of 3 main steps', {exact:false})).toBeVisible();

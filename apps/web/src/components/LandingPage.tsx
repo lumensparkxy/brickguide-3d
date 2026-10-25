@@ -10,7 +10,7 @@ export default function LandingPage({setNumber,onSetNumber,onFind,onTry,busy,chi
   onTry:()=>void; busy:boolean; publicMode?:boolean; previewMode?:boolean; children:ReactNode;
 }) {
   return <>
-    <header className="landing-header"><a href="/" className="brand">Guide2Build <span>3D</span></a><a className="how-link" href="#how-it-works">How it works</a></header>
+    <header className="landing-header"><a href="/lego" className="brand">Guide2Build <span>3D</span></a><nav aria-label="Project navigation"><a className="how-link" href="/">Project home</a><a className="how-link" href="#how-it-works">How it works</a></nav></header>
     <main className="landing-main">
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="hero-copy">

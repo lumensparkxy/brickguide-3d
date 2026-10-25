@@ -9,7 +9,7 @@ test('set lookup does not pretend that a model already exists', async ({ page })
   await page.route('**/api/v1/sets/30669/guides/alt-02/scene', route => route.fulfill({ status: 409,
     json: { detail: { code: 'reconstruction_not_available', message: 'The 3D reconstruction has not been prepared yet.' } } }));
   await page.route('**/api/v1/sets/30669/guides/alt-02/status',route=>route.fulfill({json:{source_available:true,latest_candidate_revision:null,latest_reviewed_revision:null,job:null,coverage:null}}));
-  await page.goto('/');
+  await page.goto('/lego');
   await expect(page.getByLabel('Set number')).toHaveValue('30669');
   await page.getByRole('button', { name: 'Find my set' }).click();
   await expect(page.getByRole('heading', { name: '30669 · Iconic Red Plane' })).toBeVisible();
@@ -19,7 +19,7 @@ test('set lookup does not pretend that a model already exists', async ({ page })
 });
 test('small-screen landing is usable', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/lego');
   await expect(page.getByRole('button', { name: 'Find my set' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
@@ -33,7 +33,7 @@ test('preparation reports persisted stages and supports cancellation and retry',
   await page.route('**/api/v1/jobs/test-job',r=>r.fulfill({json:job()}));
   await page.route('**/api/v1/jobs/test-job/cancel',r=>{state='cancelled';return r.fulfill({json:job()});});
   await page.route('**/api/v1/jobs/test-job/retry',r=>{state='failed';attempts++;return r.fulfill({json:job()});});
-  await page.goto('/');await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/lego');await page.getByRole('button',{name:'Find my set'}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await page.getByRole('button',{name:'Prepare official booklet',exact:true}).click();await expect(page.getByText('Stage: fetching')).toBeVisible();
   await page.getByRole('button',{name:'Cancel preparation',exact:true}).click();await expect(page.locator('.job-state')).toContainText('cancelled');
   await page.getByRole('button',{name:'Retry preparation',exact:true}).click();await expect(page.locator('.job-state')).toContainText('Source download interrupted');

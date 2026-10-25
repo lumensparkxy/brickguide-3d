@@ -39,7 +39,7 @@ async function openChunkedFixture(page:Page) {
     resources:{'parts/synthetic.dat':{dependencies:[]}},file_map:{'synthetic.dat':'parts/synthetic.dat'}}}));
   await page.route('**/published-assets/playback-fixture/ldraw/LDConfig.ldr',route=>route.fulfill({body:'0 !COLOUR White CODE 15 VALUE #FFFFFF EDGE #333333\n'}));
   await page.route('**/published-assets/playback-fixture/ldraw/parts/synthetic.dat',route=>route.fulfill({body:geometry}));
-  await page.goto('/');await selectSyntheticSet(page);
+  await page.goto('/lego');await selectSyntheticSet(page);
   await button(page,'Find my set').click();await button(page,'Open tutorial').click();
   await expect(button(page,'Play full build')).toBeEnabled();
   return {holds,failures,requests};

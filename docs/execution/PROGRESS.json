@@ -986,5 +986,38 @@
     "temporary_inspection_server": "4186_stopped_no_data_deleted",
     "requested_local_engine_preview": "4175_available",
     "remaining": "None for the approved publication and production software checks. Reconstruction accuracy remains unverified; human assembly review and physical build are not run."
+  },
+  "furniture_branch_followup": {
+    "date": "2026-10-25",
+    "branch": "codex/ikea-assembly-assistant",
+    "status_file": "docs/furniture/PROGRESS.json",
+    "validation_report": "docs/furniture/VALIDATION.md",
+    "scope": "Separate local furniture pilot; no change to LEGO acceptance status."
+  },
+  "production_hardening_20261025": {
+    "date": "2026-10-25",
+    "status": "local_candidate_verified_container_gate_blocked",
+    "candidate": "var/releases/furniture-candidate-20261025-002",
+    "source_digest": "556c19e5e848ed37f9dd1ac150ef568f6dc73bcb6779ae7d0326072465fd628a",
+    "release_record_sha256": "d73b2c304db0879ad6026629f0e5bded175984fc68f3d1cfbd3afb563bbf152c",
+    "npm_audit_findings": 0,
+    "python_full_audit_findings": 0,
+    "python_production_audit_findings": 0,
+    "backend_tests_passed": 533,
+    "frontend_tests_passed": 111,
+    "production_browser_unique_cases_passed": 36,
+    "frozen_native_checks_passed": 23,
+    "packaging_tests_passed": 7,
+    "schema_lint_build": "passed",
+    "container_build_run_scan_rollback": "blocked_runtime_unavailable",
+    "public_voice": "disabled_no_session_route",
+    "public_scope": "furniture_only",
+    "human_review": "not_run",
+    "physical_build": "not_run",
+    "real_devices": "not_run",
+    "deployment": "not_performed",
+    "evidence": "var/evidence/production-hardening",
+    "report": "docs/furniture/PRODUCTION_HARDENING.md",
+    "compatibility_browser_tests_passed": 26
   }
 }

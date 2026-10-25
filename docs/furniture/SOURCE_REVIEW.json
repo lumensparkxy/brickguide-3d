@@ -1,0 +1,36 @@
+{
+  "review_date": "2026-10-25",
+  "actor_type": "agent",
+  "revision": "lack-30449908-v1",
+  "article_number": "30449908",
+  "source_sha256": "f99e580ebfb936f144f4fbc8ec2d55bd126ff7b71dcea5487318285c0f89b3de",
+  "decision": "source_checked",
+  "scope": "English instruction content, quantities, document/page mapping, warning/care coverage and explicitly schematic rendered states; not measured CAD or physical assembly",
+  "evidence": [
+    "docs/furniture/SOURCES.md",
+    "var/evidence/furniture/source-inspection.json",
+    "var/evidence/furniture/desktop-step-1.png",
+    "var/evidence/furniture/desktop-step-2.png",
+    "var/evidence/furniture/desktop-step-3.png",
+    "var/evidence/furniture/desktop-step-4.png",
+    "var/evidence/furniture/desktop-step-5.png"
+  ],
+  "human_review": "not_run",
+  "physical_build": "not_run",
+  "coach_followup": {
+    "revision": "lack-30449908-coach-v2",
+    "actor_type": "agent",
+    "review_date": "2026-10-25",
+    "scope": "Compared coach action copy and mapping with primary assembly page 1, English warning page 2 and care sheet page 1; inspected rendered preparation, active connection and final table views. Geometry and motion remain schematic; no torque, turn count, thread pitch or exact depth validated.",
+    "decision": "source_checked_with_schematic_limits",
+    "human_review": "not_run",
+    "physical_build": "not_run",
+    "evidence": [
+      "config/furniture/lack-30449908.json",
+      "var/furniture/documents/f99e580ebfb936f144f4fbc8ec2d55bd126ff7b71dcea5487318285c0f89b3de/page-000.png",
+      "var/furniture/documents/f99e580ebfb936f144f4fbc8ec2d55bd126ff7b71dcea5487318285c0f89b3de/page-001.png",
+      "var/furniture/documents/83a707fcef7cf10bc1417cbb82d638372188f8f0cda7137ca009de9001cc8545/page-000.png",
+      "var/evidence/coach-redesign/browser-inspection.json"
+    ]
+  }
+}

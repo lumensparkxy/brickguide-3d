@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 const evidence='var/evidence/review-panel';
 async function open(page:import('@playwright/test').Page){
-  await page.goto('/');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('/lego');await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.locator('.viewport canvas')).toBeVisible();await expect(page.getByText('Loading individual part geometry…')).toBeHidden({timeout:30000});
   await page.getByRole('button',{name:'Review candidate',exact:true}).click();
 }

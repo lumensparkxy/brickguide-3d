@@ -16,7 +16,7 @@ test.afterAll(()=>server?.kill());
 test('real public portal records unavailable and unknown requests without private routes',async({page})=>{
   const privateRequests:string[]=[];
   page.on('request',r=>{if(/\/api\/v1\/(conversions|jobs|sources|reconstructions)\b|assets-local/.test(r.url()))privateRequests.push(r.url());});
-  await page.goto('http://127.0.0.1:8002/');
+  await page.goto('http://127.0.0.1:8002/lego');
   await page.getByLabel('Your set number').selectOption('30669');await page.getByRole('button',{name:'Find my set',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:message})).toBeVisible();
   await expect(page.getByRole('button',{name:/Prepare|conversion|Open tutorial/})).toHaveCount(0);
@@ -38,7 +38,7 @@ test('real public portal records unavailable and unknown requests without privat
 });
 test('failed request never claims it was added and supports retry',async({page})=>{
   await page.route('**/api/v1/requests',r=>r.fulfill({status:429,json:{detail:{code:'request_capacity',message:'Our building list is busy. Please try again tomorrow.'}}}));
-  await page.goto('http://127.0.0.1:8002/');await page.getByRole('button',{name:'Find my set',exact:true}).click();
+  await page.goto('http://127.0.0.1:8002/lego');await page.getByRole('button',{name:'Find my set',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('building list is busy');await expect(page.getByText(message,{exact:true})).toHaveCount(0);
   await page.unroute('**/api/v1/requests');await page.getByRole('button',{name:'Request this set',exact:true}).click();
   await expect(page.getByText(message,{exact:true})).toBeVisible();
@@ -54,7 +54,7 @@ test('synthetic release transport preserves section resets, attachment identity 
   let releaseThird!:()=>void;const thirdChunk=new Promise<void>(resolve=>{releaseThird=resolve;});
   await page.route('**/published-assets/synthetic/chunks/*.json',async r=>{const index=Number(r.request().url().split('/').at(-1)!.split('.')[0]);if(index===2)await thirdChunk;const chunk=chunks[index];return r.fulfill({body:chunk.body,contentType:'application/json'});});
   await page.route('**/published-assets/synthetic/ldraw/**',r=>r.fulfill({status:404}));
-  await page.goto('http://127.0.0.1:8002/');await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
+  await page.goto('http://127.0.0.1:8002/lego');await selectSyntheticSet(page);await page.getByRole('button',{name:'Find my set',exact:true}).click();await page.getByRole('button',{name:'Open tutorial',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Step 1',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Review candidate'})).toHaveCount(0);
   await expect(page.getByRole('link',{name:'Open official booklet'})).toHaveAttribute('href','https://www.lego.com/test.pdf#page=1');

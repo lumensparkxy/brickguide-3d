@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mkdir,writeFile} from 'node:fs/promises';
 const evidence='var/evidence/theme-consistency';
 test('booklet popup traps focus, closes with Escape and fits narrow phones',async({page})=>{
-  await mkdir(evidence,{recursive:true});await page.goto('/');
+  await mkdir(evidence,{recursive:true});await page.goto('/lego');
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:844});
     await page.getByRole('button',{name:'Find my set',exact:true}).click();
@@ -20,7 +20,7 @@ test('booklet popup traps focus, closes with Escape and fits narrow phones',asyn
 });
 
 test('Part 1, Part 2 and Attach keep controls and panels fixed at every breakpoint',async({page})=>{
-  test.setTimeout(60000);await mkdir(evidence,{recursive:true});await page.goto('/');
+  test.setTimeout(60000);await mkdir(evidence,{recursive:true});await page.goto('/lego');
   const response=page.waitForResponse(r=>/\/api\/v1\/(?:reconstructions\/[^/]+|sets\/30669\/guides\/alt-02)\/scene$/.test(r.url())&&r.status()===200);
   await page.getByRole('button',{name:'Try the plane tutorial'}).click();
   await expect(page.getByRole('button',{name:'Replay',exact:true})).toBeEnabled({timeout:30000});
@@ -56,7 +56,7 @@ test('closing a pending tutorial restores lookup and ignores its late response',
   await page.route('**/api/v1/sets/30669/guides/alt-02/scene',async route=>{
     requested();await waiting;await route.fulfill({status:409,json:{detail:{code:'not_ready',message:'Old delayed request'}}});
   });
-  await page.goto('/');await page.getByRole('button',{name:'Find my set',exact:true}).click();
+  await page.goto('/lego');await page.getByRole('button',{name:'Find my set',exact:true}).click();
   await page.getByRole('button',{name:'Open tutorial',exact:true}).click();await started;
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button',{name:'Find my set',exact:true})).toBeEnabled();

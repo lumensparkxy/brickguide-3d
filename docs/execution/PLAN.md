@@ -1,3 +1,9 @@
+# Furniture branch work — 2026-10-25
+
+The approved IKEA pilot is isolated on `codex/ikea-assembly-assistant` from baseline
+`2b59ca7`. Its implementation plan and progress are in `docs/furniture/PLAN.md` and
+`docs/furniture/PROGRESS.json`; LEGO acceptance records below are not IKEA evidence.
+
 # Execution checkpoint — 2 October 2026
 
 ## Current outcome
@@ -533,3 +539,40 @@ Temporary verification tags and the owned 4186 inspection server are removed, wi
 all frozen data and the requested 4175 preview retained. Save the evidence ledger and push its final
 documentation/verification-tool checkpoint; application inputs still match deployed commit `88e27ea`.
 Accuracy, human assembly review and physical build remain unverified or not run.
+
+Furniture full-table animation follow-up is tracked in `docs/furniture/PLAN.md` and
+`docs/furniture/PROGRESS.json`; LEGO acceptance records remain unchanged.
+
+## Production hardening — 25 October 2026
+
+Authorized scope: remediate dependency vulnerabilities, finish isolated furniture packaging,
+and test locally; no deployment or paid inference. Preserve all existing user changes.
+Dependency worker owns package manifests/lockfiles; packaging worker owns Docker/build
+helpers; primary owns public-runtime boundaries, integration/browser tests and evidence.
+Inspect fresh audits, apply compatible fixes, verify immutable asset/build inputs and
+exercise the built service (including static images, no mutable/voice API, error handling).
+Run Python/schema/lint/frontend checks, packaged-browser desktop/phone coverage and
+existing regressions. Record exact results and remaining rights/device/human/hosting gates.
+Container runtime availability is a separate check, never inferred from in-process smoke.
+
+Hardening checkpoint: dependency audits clean; frozen furniture candidate-002 has exact
+source/assets/frontend checks and 23 native source-failure/recovery checks. Full core
+checks passed (533 backend,111 frontend); 36 production browser cases passed. Docker
+and Podman are absent, so container execution/scan/rollback are a specific unresolved
+engineering gate. Rights, launch scope/hosting, human/physical/device checks remain
+separate. See docs/furniture/PRODUCTION_HARDENING.md for exact evidence and hashes.
+
+Final compatibility: 26 homepage/LEGO software browser cases passed with fresh isolated
+servers. Original Vite preview restored on 5173 after dependency replacement. Final
+source inventory and rebuilt frontend still match candidate-002. No deployment.
+
+## GitHub container validation — 25 October 2026
+
+User authorized GitHub Actions build and container tests, with deployment separate.
+Prepare a dedicated CI branch and pinned workflow with read-only repository permissions.
+Fetch only curated official furniture sources on the ephemeral runner; build the frozen
+context, scan the resulting image, run hardened container HTTP and browser tests.
+Upload only allowlisted metadata/test reports, never source manuals/crops/images or
+container archives. No deployment, registry publication, provider keys or paid inference.
+Validate locally, push the task branch, inspect the real GitHub run and fix failures.
+Primary owns workflow/config/docs; container-check worker owns smoke helper and tests.

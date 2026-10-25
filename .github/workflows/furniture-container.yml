@@ -1,0 +1,137 @@
+name: furniture-container-validation
+
+# Branch push bootstraps the first run without changing the default branch.
+# Manual dispatch becomes available after this workflow reaches the default branch.
+on:
+  push:
+    branches: [codex/furniture-container-ci]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: furniture-container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      PYTHONDONTWRITEBYTECODE: '1'
+      CANDIDATE: var/releases/furniture-ci
+      IMAGE: furniture-coach:ci
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.9.2'
+          enable-cache: false
+          python-version: '3.11'
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Install locked dependencies and run core checks
+        run: |
+          uv sync --frozen --extra dev
+          npm ci --ignore-scripts
+          .venv/bin/python tools/check.py
+          npx playwright install --with-deps chromium
+      - name: Prepare pinned source assets and frozen candidate
+        run: |
+          for article in 30449908 80104268 70319028; do
+            PYTHONPATH=apps/api/src .venv/bin/python tools/prepare_furniture.py --download --article "$article"
+          done
+          .venv/bin/python tools/prepare_furniture_release.py --output "$CANDIDATE"
+          .venv/bin/python tools/verify_furniture_context.py "$CANDIDATE/context"
+          mkdir -p var/evidence/container-ci
+          cp "$CANDIDATE/release.json" var/evidence/container-ci/release.json
+      - name: Build verified image without publishing
+        id: build
+        run: |
+          docker buildx build --load --progress plain \
+            --metadata-file var/evidence/container-ci/build-metadata.json \
+            --file "$CANDIDATE/context/deploy/furniture/Dockerfile" \
+            --build-context "furniture-assets=./$CANDIDATE/assets" \
+            --tag "$IMAGE" "$CANDIDATE/context"
+          docker image inspect "$IMAGE" --format '{{.Id}}' > var/evidence/container-ci/image-id.txt
+      - name: Scan all OS and language package vulnerabilities
+        id: scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: furniture-coach:ci
+          scanners: vuln
+          format: json
+          output: var/evidence/container-ci/trivy.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '0'
+          cache: false
+      - name: Start restricted container and verify HTTP boundaries
+        run: |
+          docker run --detach --name furniture-ci \
+            --publish 127.0.0.1:8088:8080 --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m --cap-drop ALL \
+            --security-opt no-new-privileges:true --pids-limit 128 \
+            --memory 512m --cpus 2 "$IMAGE"
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 2 --retry-max-time 60 --max-time 5 http://127.0.0.1:8088/api/v1/furniture/health > /dev/null
+          .venv/bin/python tools/test_furniture_container.py \
+            --container furniture-ci --expected-image "$(cat var/evidence/container-ci/image-id.txt)" --output var/evidence/container-ci/smoke.json
+      - name: Browser tests against the actual container
+        env:
+          FURNITURE_CONTAINER_TEST: '1'
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: var/evidence/container-ci/browser.xml
+        run: npx playwright test --config playwright.production.config.ts --reporter=line,junit
+      - name: Verify container restart recovery
+        run: |
+          docker restart furniture-ci
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 2 --retry-max-time 60 --max-time 5 http://127.0.0.1:8088/api/v1/furniture/health > /dev/null
+          .venv/bin/python tools/test_furniture_container.py \
+            --container furniture-ci --expected-image "$(cat var/evidence/container-ci/image-id.txt)" --output var/evidence/container-ci/restart.json
+      - name: Enforce image vulnerability gate
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          .venv/bin/python - <<'PY'
+          import json, os
+          from pathlib import Path
+          if os.environ['SCAN_OUTCOME'] != 'success':
+              raise SystemExit('Image scanner did not complete successfully')
+          report = json.loads(Path('var/evidence/container-ci/trivy.json').read_text())
+          if not isinstance(report.get('Results'), list) or not report['Results']:
+              raise SystemExit('Image scanner returned no analyzable package results')
+          findings = [v for r in report.get('Results', []) for v in r.get('Vulnerabilities', [])]
+          blocking = [v for v in findings if v.get('Severity') in {'HIGH', 'CRITICAL'}]
+          summary = {'total_findings': len(findings), 'high_critical_findings': len(blocking),
+                     'deployment_performed': False, 'image_published': False}
+          Path('var/evidence/container-ci/security-summary.json').write_text(json.dumps(summary, indent=2))
+          print(json.dumps(summary))
+          if blocking:
+              raise SystemExit('Image contains HIGH/CRITICAL findings; review trivy.json')
+          PY
+      - name: Upload metadata and text reports only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: furniture-container-reports-${{ github.sha }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            var/evidence/container-ci/release.json
+            var/evidence/container-ci/build-metadata.json
+            var/evidence/container-ci/image-id.txt
+            var/evidence/container-ci/trivy.json
+            var/evidence/container-ci/security-summary.json
+            var/evidence/container-ci/smoke.json
+            var/evidence/container-ci/restart.json
+            var/evidence/container-ci/browser.xml
+      - name: Remove test container
+        if: ${{ always() }}
+        run: docker rm --force furniture-ci || true
