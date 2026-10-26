@@ -60,6 +60,9 @@ jobs:
             --build-context "furniture-assets=./$CANDIDATE/assets" \
             --tag "$IMAGE" "$CANDIDATE/context"
           docker image inspect "$IMAGE" --format '{{.Id}}' > var/evidence/container-ci/image-id.txt
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true --entrypoint dpkg-query "$IMAGE" \
+            -W '-f=${binary:Package}\t${Version}\n' > var/evidence/container-ci/packages.tsv
       - name: Scan all OS and language package vulnerabilities
         id: scan
         continue-on-error: true
@@ -127,6 +130,7 @@ jobs:
             var/evidence/container-ci/release.json
             var/evidence/container-ci/build-metadata.json
             var/evidence/container-ci/image-id.txt
+            var/evidence/container-ci/packages.tsv
             var/evidence/container-ci/trivy.json
             var/evidence/container-ci/security-summary.json
             var/evidence/container-ci/smoke.json

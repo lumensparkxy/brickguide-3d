@@ -583,3 +583,11 @@ Run40240643751 is correctly failed by44 HIGH OS-package findings across8 CVEs; n
 fixed versions are reported. Software CI40240643815 passed. No suppression, merge,
 registry publication, secret setup or deployment. Keep the release blocked on this
 specific security gate; exact evidence is in docs/furniture/GITHUB_CONTAINER_CI.md.
+
+## Remaining container findings — 26 October 2026
+
+Verify all eight CVEs against Debian's current tracker and the pinned image digest.
+Remove only unused non-Essential login/mount packages with a fail-closed dependency
+simulation; retain required libraries and Essential packages. Test the removal guard,
+record installed package versions, rerun GitHub software/container checks and compare
+the actual scan. Keep HIGH/CRITICAL including unfixed findings blocking. No deployment.
