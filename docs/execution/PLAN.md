@@ -587,7 +587,12 @@ specific security gate; exact evidence is in docs/furniture/GITHUB_CONTAINER_CI.
 ## Remaining container findings — 26 October 2026
 
 Verify all eight CVEs against Debian's current tracker and the pinned image digest.
-Remove only unused non-Essential login/mount packages with a fail-closed dependency
-simulation; retain required libraries and Essential packages. Test the removal guard,
+Remove only unused non-Essential mount with a fail-closed dependency
+simulation and Essential/Protected checks; APT rejected removal of Protected login; retain required libraries and Essential packages. Test the removal guard,
 record installed package versions, rerun GitHub software/container checks and compare
 the actual scan. Keep HIGH/CRITICAL including unfixed findings blocking. No deployment.
+
+Follow-up checkpoint: tested commit9434db7 passed build,36 container browser cases,
+31 smoke and31 restart checks. Software CI passed560 backend/111 frontend/17 browser
+tests (two optional backend skips). Mount removal reduced HIGH findings44 to40;
+all8 CVEs remain blocked, with no suppressions. No deployment. See current CI report.

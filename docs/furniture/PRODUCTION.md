@@ -40,7 +40,7 @@ Local verification and exact candidate identity are recorded in
 frontend and isolated server, not Vite. Native frozen-candidate checks exercise source
 corruption/missing-file failures and recovery. Docker/Podman remain absent locally, but GitHub has now built and exercised the image.
 All 36 container browser tests and 31 smoke plus 31 restart checks passed. The image
-scan blocks release on 44 HIGH package findings across eight CVEs with no fixed versions
+scan blocks release on 40 HIGH package findings across eight CVEs with no fixed versions
 reported. See [GitHub container results](GITHUB_CONTAINER_CI.md). Actual deployment
 rollback remains **not run**.
 The existing frontend chunk-size advisory and TestClient deprecation are retained.
@@ -49,7 +49,7 @@ The existing frontend chunk-size advisory and TestClient deprecation are retaine
 
 | Gate | Required evidence / decision | Current state |
 |---|---|---|
-| Container | Resolve scanner findings; actual deployment rollback | GitHub build/browser/restart passed; scan blocks 44 HIGH package findings |
+| Container | Resolve scanner findings; actual deployment rollback | GitHub build/browser/restart passed; scan blocks 40 HIGH package findings |
 | Source review | Human checks exact coach revision and action/source links | not_run |
 | Physical pilot | Five first-time users under PILOT_STUDY.md | not_run |
 | Devices | Actual iPhone/Safari and Android/Chrome; microphone only if voice is later enabled | not_run |

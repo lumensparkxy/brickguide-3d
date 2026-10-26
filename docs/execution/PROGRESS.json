@@ -1049,5 +1049,40 @@
     "physical_build": "not_run",
     "evidence": "var/evidence/github-container-ci/run-40240643751",
     "report": "docs/furniture/GITHUB_CONTAINER_CI.md"
+  },
+  "github_security_followup_20261026": {
+    "date": "2026-10-26",
+    "status": "runtime_passed_security_blocked",
+    "tested_commit": "9434db7afc4c9c66bbc62b49471d161f26830354",
+    "container_run": 40386411228,
+    "software_run": 40386411230,
+    "image_id": "sha256:50eb61a3645bf6eff75f19f23f71b70327e52594c5270ebf60d6b7f23a515b86",
+    "source_digest": "2ffc4467437dbbb8f87d56c552da25567e0934065504d51fcc93ed1148ccda16",
+    "removed_packages": [
+      "mount"
+    ],
+    "retained_protected_packages": [
+      "login"
+    ],
+    "github_backend_passed": 560,
+    "github_backend_skipped": 2,
+    "frontend_tests_passed": 111,
+    "software_browser_tests_passed": 17,
+    "container_browser_tests_passed": 36,
+    "container_smoke_checks_passed": 31,
+    "container_restart_checks_passed": 31,
+    "blocking_package_findings_before": 44,
+    "blocking_package_findings": 40,
+    "blocking_unique_cves": 8,
+    "scan_severity_counts": {
+      "LOW": 60,
+      "MEDIUM": 57,
+      "HIGH": 40,
+      "UNKNOWN": 1
+    },
+    "image_published": false,
+    "deployment_performed": false,
+    "evidence": "var/evidence/github-container-ci/run-40386411228",
+    "report": "docs/furniture/GITHUB_CONTAINER_CI.md"
   }
 }
