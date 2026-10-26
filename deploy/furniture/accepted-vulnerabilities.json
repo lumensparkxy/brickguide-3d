@@ -1,0 +1,18 @@
+{
+  "decision": "Owner-approved risk acceptance for the read-only furniture demo service",
+  "approved_by": "repository owner (in-session instruction, 26 October 2026)",
+  "approved_on": "2026-10-26",
+  "expires_on": "2026-11-25",
+  "rationale": "No Debian 13 (trixie) fixed version exists for these CVEs. The service runs non-root with dropped capabilities, no-new-privileges and no mount, nsenter, systemd-homed, infocmp or Archive::Tar use. Any other HIGH/CRITICAL finding still fails the gate.",
+  "review": "Rebuild and remove entries as soon as Debian ships fixes; the gate fails after expires_on.",
+  "cves": {
+    "CVE-2026-76642": "util-linux X-mount post-hooks",
+    "CVE-2026-78408": "util-linux nsenter --join-cgroup",
+    "CVE-2026-78409": "util-linux X-mount.subdir escape",
+    "CVE-2026-78410": "util-linux restricted bind mounts",
+    "CVE-2025-69720": "ncurses infocmp overflow",
+    "CVE-2026-16742": "systemd-homed signature verification",
+    "CVE-2026-54369": "acl symlink traversal",
+    "CVE-2026-9538": "perl Archive::Tar allocation"
+  }
+}

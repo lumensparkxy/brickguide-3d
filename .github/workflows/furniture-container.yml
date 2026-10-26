@@ -104,6 +104,7 @@ jobs:
         run: |
           .venv/bin/python - <<'PY'
           import json, os
+          from datetime import date
           from pathlib import Path
           if os.environ['SCAN_OUTCOME'] != 'success':
               raise SystemExit('Image scanner did not complete successfully')
@@ -111,8 +112,17 @@ jobs:
           if not isinstance(report.get('Results'), list) or not report['Results']:
               raise SystemExit('Image scanner returned no analyzable package results')
           findings = [v for r in report.get('Results', []) for v in r.get('Vulnerabilities', [])]
-          blocking = [v for v in findings if v.get('Severity') in {'HIGH', 'CRITICAL'}]
-          summary = {'total_findings': len(findings), 'high_critical_findings': len(blocking),
+          high = [v for v in findings if v.get('Severity') in {'HIGH', 'CRITICAL'}]
+          policy = json.loads(Path('deploy/furniture/accepted-vulnerabilities.json').read_text())
+          if date.today() > date.fromisoformat(policy['expires_on']):
+              raise SystemExit(f"Vulnerability acceptance expired on {policy['expires_on']}")
+          accepted = [v for v in high if v.get('VulnerabilityID') in policy['cves']]
+          blocking = [v for v in high if v.get('VulnerabilityID') not in policy['cves']]
+          summary = {'total_findings': len(findings), 'high_critical_findings': len(high),
+                     'accepted_high_critical_findings': len(accepted),
+                     'accepted_cves': sorted({v['VulnerabilityID'] for v in accepted}),
+                     'acceptance_expires_on': policy['expires_on'],
+                     'blocking_findings': len(blocking),
                      'deployment_performed': False, 'image_published': False}
           Path('var/evidence/container-ci/security-summary.json').write_text(json.dumps(summary, indent=2))
           print(json.dumps(summary))
