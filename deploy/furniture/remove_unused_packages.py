@@ -1,10 +1,10 @@
-"""Remove only two reviewed, non-Essential runtime tools; never autoremove."""
+"""Remove only the reviewed, non-Essential mount tool; never autoremove."""
 
 import os
 import subprocess
 
 
-PACKAGES = frozenset({"login", "mount"})
+PACKAGES = frozenset({"mount"})
 
 
 def validate_plan(output: str) -> None:
@@ -27,15 +27,17 @@ def main() -> None:
     env = {**os.environ, "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive"}
     packages = sorted(PACKAGES)
     for package in packages:
-        essential = subprocess.check_output(
-            ["dpkg-query", "-W", "-f=${Essential}", package], text=True, env=env
-        ).strip()
-        if essential not in {"", "no"}:
-            raise RuntimeError(f"Refusing to remove Essential package: {package}")
+        for field in ("Essential", "Protected"):
+            value = subprocess.check_output(
+                ["dpkg-query", "-W", f"-f=${{{field}}}", package], text=True, env=env
+            ).strip()
+            if value not in {"", "no"}:
+                raise RuntimeError(f"Refusing to remove {field} package: {package}")
     command = ["apt-get", "purge", "--yes", *packages]
-    plan = subprocess.check_output([*command, "--simulate"], text=True, env=env)
-    print(plan, flush=True)
-    validate_plan(plan)
+    plan = subprocess.run([*command, "--simulate"], text=True, env=env, stdout=subprocess.PIPE)
+    print(plan.stdout, flush=True)
+    plan.check_returncode()
+    validate_plan(plan.stdout)
     subprocess.run(command, check=True, env=env)
     subprocess.run(["apt-get", "check"], check=True, env=env)
 

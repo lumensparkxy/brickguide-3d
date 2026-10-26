@@ -34,8 +34,8 @@ COPY --from=web /app/apps/web/dist apps/web/dist
 ENV PYTHONPATH=/app/apps/api/src PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 RUN python tools/check_furniture_release.py --cache /app/var/furniture --web-dist /app/apps/web/dist --release-record /app/release.json --strict-cache
 RUN useradd --uid 10001 --no-create-home app
-# Remove unused login and mount executables through the package manager. The guard
-# refuses Essential packages or any additional dependency removals; no force flags.
+# Remove unused mount executables through the package manager. The guard
+# refuses Essential/Protected packages or any additional dependency removals; no force flags.
 COPY --from=verified-source /source/deploy/furniture/remove_unused_packages.py /tmp/remove_unused_packages.py
 RUN python /tmp/remove_unused_packages.py && rm /tmp/remove_unused_packages.py
 RUN python -c "import ctypes, curses, readline, sqlite3, ssl, uuid; uuid.uuid4(); ssl.create_default_context()"
