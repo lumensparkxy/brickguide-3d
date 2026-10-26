@@ -1,0 +1,22 @@
+# Builds a frozen furniture candidate directory (submitted as the build source):
+#   gcloud builds submit var/releases/<candidate> --config deploy/cloudbuild.furniture.yaml \
+#     --substitutions _IMAGE=europe-west1-docker.pkg.dev/<project>/guide2build/furniture-coach:<tag>
+# The candidate's context/ and assets/ are used exactly as prepared and verified.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        docker buildx create --use --driver docker-container >/dev/null
+        docker buildx build --load --progress plain \
+          --file context/deploy/furniture/Dockerfile \
+          --build-context furniture-assets=./assets \
+          --tag "${_IMAGE}" context
+images: ['${_IMAGE}']
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_MEDIUM
+timeout: 1800s

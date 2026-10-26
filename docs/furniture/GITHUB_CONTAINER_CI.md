@@ -116,3 +116,28 @@ Debian fixes or a separately scoped, compatibility-tested runtime replacement; m
 unstable packages, forcibly removing protected dependencies, and scan exceptions were
 not used. No user credential or policy waiver is needed for this completed investigation.
 No deployment, registry publication, merge to main, provider key or inference occurred.
+
+## Owner-approved demo deployment — 26 October 2026
+
+The repository owner directed deployment of the furniture service as a simple demo and
+made three explicit decisions: accept the eight unfixed Debian CVEs above, serve the
+bundled official manuals publicly without a rights review, and use a new Cloud Run
+service so `guide2build-web` is unchanged. These are owner risk acceptances, not fixes.
+
+- Gate change (`f0e97b9`): `deploy/furniture/accepted-vulnerabilities.json` lists only the
+  eight CVE IDs, with rationale and expiry `2026-11-25`. The gate fails after expiry and
+  still blocks any other HIGH/CRITICAL finding. Severity and scanner settings are unchanged.
+- [Container run 40391562752](https://github.com/lumensparkxy/brickguide-3d/actions/runs/40391562752): passed. 158 findings, 40 HIGH (all from the eight accepted CVEs), zero CRITICAL, zero blocking. [Software run 40391562830](https://github.com/lumensparkxy/brickguide-3d/actions/runs/40391562830): passed.
+- Candidate `var/releases/furniture-candidate-20261026-003` (clean tree at `f0e97b9`) was built
+  by Cloud Build `7de45355-d894-47e2-ab30-41275828d019` with `deploy/cloudbuild.furniture.yaml`;
+  the Linux frontend rebuild matched the candidate record.
+- Image: `europe-west1-docker.pkg.dev/lumensparkxy/guide2build/furniture-coach@sha256:d8b41b7fa41e46c406dbd704713d774fd252d6f6cfebeb4376f075842c5fb2cf`.
+- Service `guide2build-furniture`, revision `guide2build-furniture-00001-4sx`, europe-west1,
+  public, min 0 / max 1 instance, 512Mi, runtime service account `guide2build-furniture` with no roles.
+  URL: https://guide2build-furniture-989917723212.europe-west1.run.app/ikea
+- Live checks: health ready with all three documents; voice-session, LEGO job, OpenAPI and docs
+  routes return 404; CSP, frame denial and Permissions-Policy headers present. The 36-case
+  furniture browser suite passed against the live URL (`var/evidence/furniture-live/`).
+- Not run: rollback rehearsal (there is no previous revision), human source review, physical
+  pilot, real devices, rights review. Public voice remains disabled. The UI still shows a
+  "Local edition" badge and a "Project home" link that redirects back to `/ikea`.

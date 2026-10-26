@@ -49,16 +49,16 @@ The existing frontend chunk-size advisory and TestClient deprecation are retaine
 
 | Gate | Required evidence / decision | Current state |
 |---|---|---|
-| Container | Resolve scanner findings; actual deployment rollback | GitHub build/browser/restart passed; scan blocks 40 HIGH package findings |
+| Container | Resolve scanner findings; actual deployment rollback | Eight unfixed CVEs owner-accepted until 2026-11-25; gate passes; rollback not run |
 | Source review | Human checks exact coach revision and action/source links | not_run |
 | Physical pilot | Five first-time users under PILOT_STUDY.md | not_run |
 | Devices | Actual iPhone/Safari and Android/Chrome; microphone only if voice is later enabled | not_run |
 | Accessibility/performance | Human screen-reader/zoom/contrast review and real-phone performance | Automated subset only |
-| Rights | Permission/appropriate basis to distribute the bundled manuals and rendered pages | unresolved |
+| Rights | Permission/appropriate basis to distribute the bundled manuals and rendered pages | unresolved; owner accepted the risk for the 26 Oct demo deployment |
 | Scope | Confirm furniture-only public pilot; combined homepage/LEGO or public voice need separate packaging/security work | pending decision |
 | Hosting/operations | Target/domain/TLS, support contact, monitoring and incident owner | not configured |
 | Public voice | Authenticated authorization, enforceable spending controls and provider/privacy review | Disabled in this candidate |
-| Deployment | Approval for exact tested candidate after the remaining gates | not performed |
+| Deployment | Approval for exact tested candidate after the remaining gates | Owner-approved demo deployed 26 Oct to Cloud Run `guide2build-furniture`; see GITHUB_CONTAINER_CI.md |
 
 Do not treat user checkboxes, an animated completed table, agent review or software
 passes as human source review or physical assembly evidence. Existing LEGO alpha

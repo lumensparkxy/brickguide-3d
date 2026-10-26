@@ -596,3 +596,11 @@ Follow-up checkpoint: tested commit9434db7 passed build,36 container browser cas
 31 smoke and31 restart checks. Software CI passed560 backend/111 frontend/17 browser
 tests (two optional backend skips). Mount removal reduced HIGH findings44 to40;
 all8 CVEs remain blocked, with no suppressions. No deployment. See current CI report.
+
+## Furniture demo deployment — 26 October 2026
+
+Owner directed a demo deployment. Accept only the eight unfixed CVEs with an expiry,
+rerun GitHub checks, build the frozen candidate in Cloud Build, deploy a new Cloud Run
+service (LEGO site untouched), and verify the live URL with HTTP and browser checks.
+Result: deployed `guide2build-furniture` at `f0e97b9`; 36/36 live browser tests passed.
+Rollback rehearsal, human/physical/rights review remain not run. See furniture CI report.

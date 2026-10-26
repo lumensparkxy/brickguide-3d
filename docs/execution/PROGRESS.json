@@ -1084,5 +1084,49 @@
     "deployment_performed": false,
     "evidence": "var/evidence/github-container-ci/run-40386411228",
     "report": "docs/furniture/GITHUB_CONTAINER_CI.md"
+  },
+  "furniture_demo_deployment_20261026": {
+    "date": "2026-10-26",
+    "status": "owner_approved_demo_deployed",
+    "owner_decisions": [
+      "accept eight unfixed Debian CVEs until 2026-11-25 (deploy/furniture/accepted-vulnerabilities.json)",
+      "serve bundled official manuals publicly as a demo; rights review not performed",
+      "new Cloud Run service; guide2build-web unchanged"
+    ],
+    "tested_commit": "f0e97b93d694774ad0ad9ff9ea7a54084e154df9",
+    "container_run": 40391562752,
+    "software_run": 40391562830,
+    "scan": {
+      "total": 158,
+      "high_critical": 40,
+      "accepted": 40,
+      "blocking": 0,
+      "critical": 0
+    },
+    "candidate": "var/releases/furniture-candidate-20261026-003",
+    "cloud_build": "7de45355-d894-47e2-ab30-41275828d019",
+    "image": "europe-west1-docker.pkg.dev/lumensparkxy/guide2build/furniture-coach@sha256:d8b41b7fa41e46c406dbd704713d774fd252d6f6cfebeb4376f075842c5fb2cf",
+    "service": "guide2build-furniture",
+    "region": "europe-west1",
+    "revision": "guide2build-furniture-00001-4sx",
+    "url": "https://guide2build-furniture-989917723212.europe-west1.run.app/ikea",
+    "runtime_service_account": "guide2build-furniture@lumensparkxy.iam.gserviceaccount.com (no roles)",
+    "limits": {
+      "min_instances": 0,
+      "max_instances": 1,
+      "memory": "512Mi",
+      "cpu": 1
+    },
+    "live_checks": {
+      "http_route_checks": "passed",
+      "browser_tests_passed": 36,
+      "browser_tests_failed": 0
+    },
+    "rollback_rehearsal": "not_run",
+    "human_review": "not_run",
+    "physical_build": "not_run",
+    "rights_review": "not_performed_owner_accepted_risk",
+    "public_voice": "disabled",
+    "evidence": "var/evidence/furniture-live/"
   }
 }
